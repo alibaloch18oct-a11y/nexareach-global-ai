@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Brain,
   Building2,
@@ -59,6 +59,23 @@ const categories = [
   "travel agencies"
 ];
 
+const fallbackProfile = {
+  fullName: "Shahzaib Ali",
+  title: "Information Technology Graduate | AI & Full Stack Developer",
+  email: "alibaloch18oct@gmail.com",
+  phone: "",
+  whatsapp: "",
+  location: "Pakistan",
+  portfolio: "",
+  linkedin: "",
+  github: "",
+  resumeUrl: "",
+  skills: "React, Node.js, AI Apps, Dashboards, Automation, JavaScript, Express",
+  projects:
+    "NexaAgent AI, Jarvis AI Assistant, School Management System, FBR AI Assistant, Portfolio Website",
+  bio: "I build AI-powered software, business automation tools, dashboards, and modern web applications."
+};
+
 const emptyLead = {
   name: "",
   category: "Business",
@@ -82,6 +99,12 @@ function makeWhatsAppUrl(phone, message) {
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
 }
 
+function safeMessageFromError(error) {
+  if (!error) return "Unknown error";
+  if (typeof error === "string") return error;
+  return error.message || "Unknown error";
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [profile, setProfile] = useState(null);
@@ -101,6 +124,7 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [csvImporting, setCsvImporting] = useState(false);
   const [notice, setNotice] = useState("");
+  const [backendWarning, setBackendWarning] = useState("");
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
@@ -121,22 +145,35 @@ export default function App() {
   });
 
   async function api(path, options = {}) {
-    const response = await fetch(`${API}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      },
-      ...options
-    });
+    const url = `${API}${path}`;
+
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        },
+        ...options
+      });
+    } catch (error) {
+      throw new Error(
+        `Backend not reachable. Check VITE_API_URL in Vercel or backend URL. Current API: ${API}`
+      );
+    }
 
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || data.details || "Request failed");
+
+    if (!response.ok) {
+      throw new Error(data.error || data.details || `Request failed: ${response.status}`);
+    }
+
     return data;
   }
 
   function notify(message) {
     setNotice(message);
-    setTimeout(() => setNotice(""), 6500);
+    setTimeout(() => setNotice(""), 7000);
   }
 
   function buildLeadQuery(customPage = page) {
@@ -155,6 +192,7 @@ export default function App() {
   async function loadLeads(customPage = page) {
     try {
       const data = await api(`/api/leads?${buildLeadQuery(customPage)}`);
+
       setLeads(data.items || []);
       setLeadMeta({
         total: data.total || 0,
@@ -163,8 +201,27 @@ export default function App() {
         limit: data.limit || 50
       });
       setCounts(data.counts || {});
+      setBackendWarning("");
     } catch (error) {
-      notify(error.message);
+      console.error("Lead loading failed:", error);
+
+      setLeads([]);
+      setLeadMeta({
+        total: 0,
+        totalPages: 1,
+        page: 1,
+        limit: 50
+      });
+      setCounts({
+        total: 0,
+        readyToWhatsApp: 0,
+        needsPhone: 0,
+        sent: 0
+      });
+
+      setBackendWarning(
+        `Could not load leads. ${safeMessageFromError(error)}`
+      );
     }
   }
 
@@ -175,10 +232,17 @@ export default function App() {
         api("/api/logs")
       ]);
 
-      setProfile(profileData);
-      setLogs(logsData);
+      setProfile(profileData || fallbackProfile);
+      setLogs(Array.isArray(logsData) ? logsData : []);
+      setBackendWarning("");
     } catch (error) {
-      notify(error.message);
+      console.error("Backend connection failed:", error);
+
+      setProfile(fallbackProfile);
+      setLogs([]);
+      setBackendWarning(
+        `Backend connection failed. App opened in safe mode. ${safeMessageFromError(error)}`
+      );
     }
   }
 
@@ -187,15 +251,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!profile) return;
+
     const timeout = setTimeout(() => {
       loadLeads(1);
       setPage(1);
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timeout);
-  }, [selectedCountry, selectedCity, statusFilter, searchText]);
+  }, [selectedCountry, selectedCity, statusFilter, searchText, profile]);
 
   useEffect(() => {
+    if (!profile) return;
     loadLeads(page);
   }, [page]);
 
@@ -225,7 +292,7 @@ export default function App() {
       setProfile(updated);
       notify("Profile saved.");
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -244,14 +311,14 @@ export default function App() {
         body: formData
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Upload failed");
 
       setProfile((prev) => ({ ...prev, resumeUrl: data.resumeUrl }));
       notify("Resume uploaded.");
       await loadBase();
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
 
     setLoading(false);
@@ -273,7 +340,7 @@ export default function App() {
         body: formData
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || data.details || "CSV import failed");
 
       notify(
@@ -283,7 +350,7 @@ export default function App() {
       await loadLeads(1);
       setPage(1);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
 
     setCsvImporting(false);
@@ -318,7 +385,7 @@ export default function App() {
       setPage(1);
       await loadLeads(1);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
 
     setImporting(false);
@@ -336,7 +403,7 @@ export default function App() {
       await loadLeads(1);
       await loadBase();
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -372,7 +439,7 @@ export default function App() {
       await loadLeads(1);
       setPage(1);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -385,7 +452,7 @@ export default function App() {
       notify("Lead deleted.");
       await loadLeads(page);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -401,7 +468,7 @@ export default function App() {
       notify("Lead updated.");
       await loadLeads(page);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -418,7 +485,7 @@ export default function App() {
       notify("Message generated.");
       await loadLeads(page);
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -435,7 +502,7 @@ export default function App() {
       await loadLeads(page);
       await loadBase();
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -454,7 +521,7 @@ export default function App() {
       setSearchLinks(data);
       notify("Search links ready.");
     } catch (error) {
-      notify(error.message);
+      notify(safeMessageFromError(error));
     }
     setLoading(false);
   }
@@ -482,7 +549,7 @@ export default function App() {
       <div className="loading-screen">
         <Loader2 className="spin" size={46} />
         <h1>NexaReach Global AI</h1>
-        <p>Loading fast paginated dashboard...</p>
+        <p>Starting app...</p>
       </div>
     );
   }
@@ -518,6 +585,12 @@ export default function App() {
 
         <div className="side-card">
           <Sparkles size={20} />
+          <h3>Active API</h3>
+          <p>{API}</p>
+        </div>
+
+        <div className="side-card">
+          <Globe2 size={20} />
           <h3>Fast Mode</h3>
           <p>
             Showing 50 leads per page. Active: {selectedCountry} / {selectedCity}
@@ -544,7 +617,14 @@ export default function App() {
 
             <label>
               <span>City</span>
-              <select value={selectedCity} onChange={(e) => { setSelectedCity(e.target.value); setSelectedLead(null); setPage(1); }}>
+              <select
+                value={selectedCity}
+                onChange={(e) => {
+                  setSelectedCity(e.target.value);
+                  setSelectedLead(null);
+                  setPage(1);
+                }}
+              >
                 {availableCities.map((city) => (
                   <option key={city}>{city}</option>
                 ))}
@@ -558,6 +638,12 @@ export default function App() {
           </div>
         </header>
 
+        {backendWarning && (
+          <div className="notice danger-notice">
+            {backendWarning}
+          </div>
+        )}
+
         {notice && <div className="notice">{notice}</div>}
 
         {activeTab === "dashboard" && (
@@ -565,9 +651,9 @@ export default function App() {
             <div className="hero-card global-hero">
               <div>
                 <p className="eyebrow">NexaReach Global AI</p>
-                <h1>Fast global outreach for large databases.</h1>
+                <h1>Fast global outreach without loading crashes.</h1>
                 <p>
-                  The app now loads only 50 leads at a time, so big CSV files will not crash the browser.
+                  This version opens even if the backend is unreachable. Check the API shown in the sidebar if you see connection warnings.
                 </p>
                 <div className="hero-actions">
                   <button className="primary-btn" onClick={() => setActiveTab("global")}>
@@ -763,7 +849,7 @@ export default function App() {
                     Leads: {selectedCountry} / {selectedCity}
                   </h3>
                   <p className="muted-line">
-                    Showing page {leadMeta.page} of {leadMeta.totalPages} Â· Total filtered: {leadMeta.total}
+                    Showing page {leadMeta.page} of {leadMeta.totalPages} · Total filtered: {leadMeta.total}
                   </p>
                 </div>
 
@@ -954,7 +1040,7 @@ export default function App() {
                   <div className="log-row" key={log.id}>
                     <div>
                       <h4>{log.action}</h4>
-                      <p>{log.leadName} Â· {log.channel} Â· {log.location || "Global"}</p>
+                      <p>{log.leadName} · {log.channel} · {log.location || "Global"}</p>
                     </div>
                     <span>{new Date(log.createdAt).toLocaleString()}</span>
                   </div>
@@ -982,7 +1068,7 @@ function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
       <div className="empty">
         <Building2 size={44} />
         <h3>No leads found</h3>
-        <p>Change filters or import leads from Global Finder.</p>
+        <p>Change filters, check backend connection, or import leads from Global Finder.</p>
       </div>
     );
   }
@@ -993,7 +1079,9 @@ function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
         <div className="lead-card" key={lead.id}>
           <div onClick={() => onSelect(lead)} className="lead-click">
             <div className="lead-top">
-              <div className="lead-icon"><Building2 size={22} /></div>
+              <div className="lead-icon">
+                <Building2 size={22} />
+              </div>
               <div>
                 <h4>{lead.name}</h4>
                 <p>{lead.category}</p>
@@ -1007,9 +1095,15 @@ function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
               <span>{lead.city || "All Cities"}</span>
             </div>
 
-            <p className="small-line"><MapPin size={13} /> {lead.address || lead.location}</p>
-            <p className="small-line"><Phone size={13} /> {lead.phone || "No phone in data"}</p>
-            <p className="small-line"><Mail size={13} /> {lead.email || "No email in data"}</p>
+            <p className="small-line">
+              <MapPin size={13} /> {lead.address || lead.location}
+            </p>
+            <p className="small-line">
+              <Phone size={13} /> {lead.phone || "No phone in data"}
+            </p>
+            <p className="small-line">
+              <Mail size={13} /> {lead.email || "No email in data"}
+            </p>
           </div>
 
           <div className="card-actions">

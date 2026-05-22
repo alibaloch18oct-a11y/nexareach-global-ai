@@ -920,3 +920,7 @@ a {
     flex-direction: column;
   }
 }
+.danger-notice {
+  background: linear-gradient(135deg, #ff4d6d, #ffcc70) !important;
+  color: #18020a !important;
+}
