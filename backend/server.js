@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.NEXAREACH_DATA_DIR || path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 const PROFILE_FILE = path.join(DATA_DIR, "profile.json");
 const LEADS_FILE = path.join(DATA_DIR, "leads.json");
@@ -922,6 +922,27 @@ app.get("/api/analytics", (req, res) => {
     cities: cities.length,
     highPriority: filtered.filter((lead) => lead.priority === "High").length
   });
+});
+app.get('/api/health', async (req, res) => {
+  try {
+    res.json({
+      status: 'ok',
+      app: 'NexaReach AI',
+      backend: 'online',
+      database: 'connected',
+      platform: 'Render',
+      time: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      app: 'NexaReach AI',
+      backend: 'online',
+      database: 'error',
+      error: error.message,
+      time: new Date().toISOString()
+    });
+  }
 });
 
 app.listen(PORT, () => {
