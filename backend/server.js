@@ -545,9 +545,11 @@ function buildMessage({ profile, lead, mode = "short_whatsapp" }) {
   const product = lead.recommendedProduct || matchProduct(lead).name;
   const portfolio = profile.portfolio || "[Portfolio Link]";
   const linkedin = profile.linkedin || "[LinkedIn Link]";
+  const resume = profile.resumeUrl || "[Resume Link]";
   const baseIntro = `Hi, I came across ${lead.businessName || "your business"} and wanted to share something that could help you manage customers, sales, operations and follow-ups more smoothly.`;
   const productLine = `I build AI-powered business software, and for your type of business I think ${product} could be useful.`;
-  const proofLine = `You can see my work here: ${portfolio}`;
+  const proofLine = `${proofLine}
+Resume: ${resume}`;
 
   if (mode === "email_pitch") {
     return `Subject: Software solution for ${lead.businessName || "your business"}
@@ -574,8 +576,7 @@ ${profile.fullName || "Shahzaib Ali"}`;
 
 For your business, ${product} may help improve operations, customer handling and daily management.
 
-Portfolio: ${portfolio}
-LinkedIn: ${linkedin}
+${proofLine}
 
 If you are open to it, I can share a short demo.`;
   }
@@ -586,6 +587,7 @@ If you are open to it, I can share a short demo.`;
 Aap ke business ke liye ${product} useful ho sakta hai because it can help manage customers, sales, orders and follow-ups.
 
 Portfolio: ${portfolio}
+Resume: ${resume}
 
 Agar aap interested hon to main quick demo share kar sakta hoon.`;
   }

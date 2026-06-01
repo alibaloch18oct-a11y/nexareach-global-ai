@@ -436,6 +436,40 @@ export default function App() {
     notify("Message copied.");
   }
 
+
+  async function uploadResume(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append("resume", file);
+
+    try {
+      const res = await fetch(`${API}/api/upload/resume`, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.details || "Resume upload failed");
+
+      setProfile((prev) => ({
+        ...prev,
+        resumeUrl: data.resumeUrl
+      }));
+
+      notify("Resume uploaded and saved in profile.");
+      await loadBase();
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+    event.target.value = "";
+  }
+
   async function importCsv(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1261,12 +1295,25 @@ export default function App() {
                 <Input label="WhatsApp" value={profile.whatsapp} onChange={(v) => setProfile({ ...profile, whatsapp: v })} />
                 <Input label="Portfolio" value={profile.portfolio} onChange={(v) => setProfile({ ...profile, portfolio: v })} />
                 <Input label="LinkedIn" value={profile.linkedin} onChange={(v) => setProfile({ ...profile, linkedin: v })} />
-                <Input label="GitHub" value={profile.github} onChange={(v) => setProfile({ ...profile, github: v })} />
+                                <Input label="GitHub" value={profile.github} onChange={(v) => setProfile({ ...profile, github: v })} />
+                <Input label="Resume URL" value={profile.resumeUrl} onChange={(v) => setProfile({ ...profile, resumeUrl: v })} />
               </div>
 
               <Textarea label="Skills" value={profile.skills} onChange={(v) => setProfile({ ...profile, skills: v })} />
               <Textarea label="Projects" value={profile.projects} onChange={(v) => setProfile({ ...profile, projects: v })} />
-              <Textarea label="Bio" value={profile.bio} onChange={(v) => setProfile({ ...profile, bio: v })} />
+                            <Textarea label="Bio" value={profile.bio} onChange={(v) => setProfile({ ...profile, bio: v })} />
+
+              <div className="upload-box">
+                <div>
+                  <h4>Resume</h4>
+                  <p>{profile.resumeUrl || "No resume URL added yet. Upload PDF or paste Google Drive resume link above."}</p>
+                </div>
+                <label className="upload-btn">
+                  <Upload size={18} />
+                  Upload Resume PDF
+                  <input hidden type="file" accept=".pdf,.doc,.docx" onChange={uploadResume} />
+                </label>
+              </div>
             </div>
           </section>
         )}
