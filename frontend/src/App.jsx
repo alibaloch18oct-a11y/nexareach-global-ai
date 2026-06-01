@@ -141,6 +141,23 @@ function splitEmailMessage(message, lead) {
   return { subject, body };
 }
 
+
+function buildGmailComposeUrl(lead, message) {
+  if (!lead?.email || !message) return "";
+
+  const { subject, body } = splitEmailMessage(message, lead);
+
+  const params = new URLSearchParams({
+    view: "cm",
+    fs: "1",
+    to: lead.email,
+    su: subject,
+    body
+  });
+
+  return `https://mail.google.com/mail/?${params.toString()}`;
+}
+
 function buildEmailOpenUrl(lead, message) {
   if (!lead?.email || !message) return "";
 
@@ -456,6 +473,56 @@ export default function App() {
     setLoading(false);
   }
 
+
+
+  async function generateEmailAndOpenGmail(lead) {
+    if (!lead?.email) {
+      notify("This lead has no email. Add email first.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const updated = await api(`/api/leads/${lead.id}/generate-message`, {
+        method: "POST",
+        body: JSON.stringify({ mode: "email_pitch" })
+      });
+
+      setSelectedLead(updated);
+      notify("Email generated. Opening Gmail compose...");
+
+      const gmailLink = buildGmailComposeUrl(updated, updated.lastMessage);
+
+      if (gmailLink) {
+        window.open(gmailLink, "_blank", "noopener,noreferrer");
+      }
+
+      await loadLeads(page);
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+  }
+
+  function openCurrentGmailDraft() {
+    if (!selectedLead?.email) {
+      notify("This lead has no email. Add email first.");
+      return;
+    }
+
+    if (!selectedLead?.lastMessage) {
+      notify("Generate an email message first.");
+      return;
+    }
+
+    const gmailLink = buildGmailComposeUrl(selectedLead, selectedLead.lastMessage);
+
+    if (gmailLink) {
+      window.open(gmailLink, "_blank", "noopener,noreferrer");
+    }
+  }
 
   async function generateEmailAndOpen(lead) {
     if (!lead?.email) {
@@ -1609,6 +1676,7 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
 
 
