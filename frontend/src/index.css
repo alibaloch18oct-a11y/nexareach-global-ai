@@ -1,4 +1,4 @@
-* {
+﻿* {
   box-sizing: border-box;
 }
 
@@ -1060,3 +1060,58 @@ a {
   font-size: 12px;
   border: 1px solid rgba(0, 240, 255, 0.18);
 }
+.contact-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.contact-badge.ready {
+  background: rgba(34, 197, 94, 0.16);
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.contact-badge.partial {
+  background: rgba(59, 130, 246, 0.15);
+  color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.contact-badge.needs {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.contact-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0 8px;
+}
+
+.contact-actions a {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.09);
+  color: #dffbff;
+  border: 1px solid rgba(0, 240, 255, 0.18);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.contact-enrichment-box {
+  border-color: rgba(251, 191, 36, 0.25) !important;
+  background: rgba(251, 191, 36, 0.06) !important;
+}
+

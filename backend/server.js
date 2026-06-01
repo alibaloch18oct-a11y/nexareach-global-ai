@@ -714,11 +714,67 @@ async function saveProfile(profile) {
   return updated;
 }
 
+
+function contactQuality(lead) {
+  const hasWhatsapp = Boolean(lead.whatsapp || lead.phone);
+  const hasEmail = Boolean(lead.email);
+  const hasWebsite = Boolean(lead.website);
+  const hasSocial = Boolean(lead.instagram || lead.facebook || lead.linkedin);
+
+  if (hasWhatsapp) return "Ready WhatsApp";
+  if (hasEmail && hasWebsite) return "Email + Website";
+  if (hasEmail) return "Has Email";
+  if (hasWebsite) return "Has Website";
+  if (hasSocial) return "Has Social";
+  return "Needs Contact";
+}
+
+function applyContactStatus(lead) {
+  const quality = contactQuality(lead);
+
+  if ((lead.whatsapp || lead.phone) && ["New", "Needs Contact", "Needs Phone", "No Contact"].includes(lead.status || "New")) {
+    return {
+      ...lead,
+      status: "Ready to WhatsApp"
+    };
+  }
+
+  if (!lead.whatsapp && !lead.phone && !lead.email && !lead.website && !lead.instagram && !lead.facebook && !lead.linkedin) {
+    if (["New", "Needs Phone"].includes(lead.status || "New")) {
+      return {
+        ...lead,
+        status: "Needs Contact"
+      };
+    }
+  }
+
+  return lead;
+}
+
+function buildLeadLinks(lead) {
+  const q = encodeURIComponent(`${lead.businessName || lead.name || ""} ${lead.city || ""} ${lead.country || ""}`.trim());
+  const website = lead.website || "";
+
+  return {
+    google: `https://www.google.com/search?q=${q}`,
+    maps: `https://www.google.com/maps/search/${q}`,
+    facebook: `https://www.facebook.com/search/pages/?q=${q}`,
+    linkedin: `https://www.linkedin.com/search/results/companies/?keywords=${q}`,
+    instagram: `https://www.instagram.com/explore/search/keyword/?q=${q}`,
+    website,
+    email: lead.email ? `mailto:${lead.email}` : ""
+  };
+}
+
 function countLocal(leads) {
   return {
     total: leads.length,
     readyToWhatsApp: leads.filter((lead) => lead.phone || lead.whatsapp).length,
     needsPhone: leads.filter((lead) => !lead.phone && !lead.whatsapp).length,
+    needsContact: leads.filter((lead) => contactQuality(lead) === "Needs Contact").length,
+    hasEmail: leads.filter((lead) => lead.email).length,
+    hasWebsite: leads.filter((lead) => lead.website).length,
+    noContact: leads.filter((lead) => !lead.phone && !lead.whatsapp && !lead.email && !lead.website && !lead.instagram && !lead.facebook && !lead.linkedin).length,
     hot: leads.filter((lead) => lead.leadTemperature === "Hot" || Number(lead.leadScore || 0) >= 75).length,
     interested: leads.filter((lead) => lead.status === "Interested").length,
     demoBooked: leads.filter((lead) => lead.status === "Demo Booked").length,
@@ -768,9 +824,13 @@ async function listLeads(query) {
 
     if (status && status !== "All") {
       if (status === "Ready to WhatsApp") {
-        db = db.not("whatsapp", "eq", "");
-      } else if (status === "Needs Phone") {
+        db = db.or("phone.not.is.null,whatsapp.not.is.null");
+      } else if (status === "Needs Phone" || status === "Needs Contact" || status === "No Contact") {
         db = db.or("phone.is.null,phone.eq.,whatsapp.is.null,whatsapp.eq.");
+      } else if (status === "Has Email") {
+        db = db.not("email", "eq", "");
+      } else if (status === "Has Website") {
+        db = db.not("website", "eq", "");
       } else {
         db = db.eq("status", status);
       }
@@ -817,8 +877,14 @@ async function listLeads(query) {
         ? true
         : status === "Ready to WhatsApp"
         ? Boolean(lead.phone || lead.whatsapp)
-        : status === "Needs Phone"
+        : status === "Needs Phone" || status === "Needs Contact"
         ? !lead.phone && !lead.whatsapp
+        : status === "Has Email"
+        ? Boolean(lead.email)
+        : status === "Has Website"
+        ? Boolean(lead.website)
+        : status === "No Contact"
+        ? !lead.phone && !lead.whatsapp && !lead.email && !lead.website && !lead.instagram && !lead.facebook && !lead.linkedin
         : lead.status === status;
 
     const haystack = `${lead.businessName} ${lead.category} ${lead.country} ${lead.city} ${lead.email} ${lead.phone}`.toLowerCase();
@@ -852,11 +918,11 @@ async function getLead(leadId) {
 }
 
 async function saveLead(lead) {
-  const prepared = {
+  const prepared = applyContactStatus({
     id: lead.id || id("lead"),
     ...lead,
     updatedAt: nowIso()
-  };
+  });
 
   if (useSupabase) {
     const { data, error } = await supabase
@@ -1662,6 +1728,19 @@ app.post("/api/leads/bulk-status", async (req, res) => {
   }
 });
 
+
+app.get("/api/leads/:id/enrichment", async (req, res) => {
+  try {
+    const lead = await getLead(req.params.id);
+    res.json({
+      contactQuality: contactQuality(lead),
+      links: buildLeadLinks(lead)
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Could not build enrichment links", details: error.message });
+  }
+});
+
 app.post("/api/leads/:id/score", async (req, res) => {
   try {
     const lead = await getLead(req.params.id);
@@ -1887,5 +1966,6 @@ app.listen(PORT, () => {
   console.log(`Phase: 2 Safe Public Discovery`);
   console.log(`Database mode: ${useSupabase ? "Supabase/PostgreSQL" : "Local JSON fallback"}`);
 });
+
 
 

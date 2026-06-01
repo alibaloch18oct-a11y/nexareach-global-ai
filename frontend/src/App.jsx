@@ -63,6 +63,10 @@ const statuses = [
   "Lost",
   "Not Interested",
   "Ready to WhatsApp",
+  "Needs Contact",
+  "Has Email",
+  "Has Website",
+  "No Contact",
   "Needs Phone"
 ];
 
@@ -128,6 +132,42 @@ function whatsappUrl(phone, message) {
   if (clean.startsWith("00")) clean = clean.slice(2);
   if (clean.startsWith("0")) clean = "92" + clean.slice(1);
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
+}
+
+
+function getContactQuality(lead) {
+  if (lead?.whatsapp || lead?.phone) return "Ready WhatsApp";
+  if (lead?.email && lead?.website) return "Email + Website";
+  if (lead?.email) return "Has Email";
+  if (lead?.website) return "Has Website";
+  if (lead?.instagram || lead?.facebook || lead?.linkedin) return "Has Social";
+  return "Needs Contact";
+}
+
+function buildEnrichmentLinks(lead) {
+  const q = encodeURIComponent(`${lead?.businessName || ""} ${lead?.city || ""} ${lead?.country || ""}`.trim());
+
+  return {
+    google: `https://www.google.com/search?q=${q}`,
+    maps: `https://www.google.com/maps/search/${q}`,
+    facebook: `https://www.facebook.com/search/pages/?q=${q}`,
+    linkedin: `https://www.linkedin.com/search/results/companies/?keywords=${q}`,
+    instagram: `https://www.instagram.com/explore/search/keyword/?q=${q}`,
+    website: lead?.website || "",
+    email: lead?.email ? `mailto:${lead.email}` : ""
+  };
+}
+
+function ContactBadge({ lead }) {
+  const quality = getContactQuality(lead);
+  const className =
+    quality === "Ready WhatsApp"
+      ? "contact-badge ready"
+      : quality === "Needs Contact"
+      ? "contact-badge needs"
+      : "contact-badge partial";
+
+  return <span className={className}>{quality}</span>;
 }
 
 export default function App() {
@@ -409,6 +449,23 @@ export default function App() {
       notify(error.message);
     }
     setLoading(false);
+  }
+
+
+  async function saveSelectedContact() {
+    if (!selectedLead) return;
+
+    const nextStatus =
+      selectedLead.whatsapp || selectedLead.phone
+        ? "Ready to WhatsApp"
+        : selectedLead.email || selectedLead.website
+        ? selectedLead.status || "New"
+        : "Needs Contact";
+
+    await updateLead(selectedLead.id, {
+      ...selectedLead,
+      status: nextStatus
+    });
   }
 
   async function analyzeReply() {
@@ -1375,6 +1432,7 @@ function LeadGrid({ leads, onSelect, onScore, onGenerate, onDelete }) {
               <span>{lead.leadTemperature || "Cold"}</span>
               <span>{lead.leadScore || 0}/100</span>
               <span>{lead.recommendedProduct || "No product"}</span>
+              <ContactBadge lead={lead} />
             </div>
 
             <p className="small-line">
@@ -1478,5 +1536,6 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
 
