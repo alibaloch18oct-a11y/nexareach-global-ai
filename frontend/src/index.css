@@ -1115,3 +1115,24 @@ a {
   background: rgba(251, 191, 36, 0.06) !important;
 }
 
+
+.email-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(56, 189, 248, 0.18);
+}
+
+.email-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+

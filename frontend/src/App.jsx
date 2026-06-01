@@ -126,6 +126,29 @@ const emptyLead = {
   conversationNotes: ""
 };
 
+
+function splitEmailMessage(message, lead) {
+  const raw = String(message || "").trim();
+  const lines = raw.split(/\r?\n/);
+  let subject = `Software solution for ${lead?.businessName || "your business"}`;
+  let body = raw;
+
+  if (lines[0]?.toLowerCase().startsWith("subject:")) {
+    subject = lines[0].replace(/^subject:\s*/i, "").trim() || subject;
+    body = lines.slice(1).join("\n").trim();
+  }
+
+  return { subject, body };
+}
+
+function buildEmailOpenUrl(lead, message) {
+  if (!lead?.email || !message) return "";
+
+  const { subject, body } = splitEmailMessage(message, lead);
+
+  return `mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function whatsappUrl(phone, message) {
   if (!phone || !message) return "";
   let clean = String(phone).replace(/[^\d]/g, "");
@@ -433,16 +456,66 @@ export default function App() {
     setLoading(false);
   }
 
-  async function markSent(lead) {
+
+  async function generateEmailAndOpen(lead) {
+    if (!lead?.email) {
+      notify("This lead has no email. Add email first.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const updated = await api(`/api/leads/${lead.id}/generate-message`, {
+        method: "POST",
+        body: JSON.stringify({ mode: "email_pitch" })
+      });
+
+      setSelectedLead(updated);
+      notify("Email generated. Opening email app...");
+
+      const emailLink = buildEmailOpenUrl(updated, updated.lastMessage);
+
+      if (emailLink) {
+        window.location.href = emailLink;
+      }
+
+      await loadLeads(page);
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+  }
+
+  function openCurrentEmailDraft() {
+    if (!selectedLead?.email) {
+      notify("This lead has no email. Add email first.");
+      return;
+    }
+
+    if (!selectedLead?.lastMessage) {
+      notify("Generate an email message first.");
+      return;
+    }
+
+    const emailLink = buildEmailOpenUrl(selectedLead, selectedLead.lastMessage);
+
+    if (emailLink) {
+      window.location.href = emailLink;
+    }
+  }
+
+  async function markSent(lead, channel = "WhatsApp") {
     setLoading(true);
     try {
       const updated = await api(`/api/leads/${lead.id}/mark-sent`, {
         method: "POST",
-        body: JSON.stringify({ channel: "WhatsApp" })
+        body: JSON.stringify({ channel })
       });
 
       setSelectedLead(updated);
-      notify("Marked as sent. Follow-up scheduled.");
+      notify(`${channel} marked as sent. Follow-up scheduled.`);
       await loadLeads(page);
       await loadBase();
     } catch (error) {
@@ -1536,6 +1609,7 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
 
 
