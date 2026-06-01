@@ -1385,7 +1385,33 @@ export default function App() {
                     ) : (
                       <button className="disabled-btn" disabled>
                         <MessageCircle size={18} />
-                        Add Phone First
+                        Add WhatsApp First
+                      </button>
+                    )}
+
+                    {selectedLead.email ? (
+                      <button className="email-btn" onClick={() => generateEmailAndOpenGmail(selectedLead)}>
+                        <Mail size={18} />
+                        Generate Email + Open Gmail
+                      </button>
+                    ) : (
+                      <button className="disabled-btn" disabled>
+                        <Mail size={18} />
+                        Add Email First
+                      </button>
+                    )}
+
+                    {selectedLead.email && selectedLead.lastMessage && (
+                      <button className="secondary-btn" onClick={openCurrentGmailDraft}>
+                        <Mail size={18} />
+                        Open Gmail
+                      </button>
+                    )}
+
+                    {selectedLead.email && selectedLead.lastMessage && (
+                      <button className="secondary-btn" onClick={openCurrentDefaultEmailDraft}>
+                        <Mail size={18} />
+                        Default Email
                       </button>
                     )}
 
@@ -1394,10 +1420,17 @@ export default function App() {
                       Copy
                     </button>
 
-                    <button className="ghost-btn" onClick={() => markSent(selectedLead)}>
+                    <button className="ghost-btn" onClick={() => markSent(selectedLead, "WhatsApp")}>
                       <Send size={18} />
-                      Mark Sent
+                      Mark WhatsApp Sent
                     </button>
+
+                    {selectedLead.email && (
+                      <button className="ghost-btn" onClick={() => markSent(selectedLead, "Email")}>
+                        <Send size={18} />
+                        Mark Email Sent
+                      </button>
+                    )}
 
                     <button className="ghost-btn" onClick={() => updateLead(selectedLead.id, { status: "Replied" })}>
                       <CheckCircle2 size={18} />
@@ -1676,6 +1709,7 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
 
 
