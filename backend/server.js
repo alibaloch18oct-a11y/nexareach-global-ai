@@ -545,10 +545,14 @@ function buildMessage({ profile, lead, mode = "short_whatsapp" }) {
   const product = lead.recommendedProduct || matchProduct(lead).name;
   const portfolio = profile.portfolio || "[Portfolio Link]";
   const linkedin = profile.linkedin || "[LinkedIn Link]";
-  const resume = profile.resumeUrl || "[Resume Link]";
+  const resume = profile.resumeUrl || profile.resume_url || "[Resume Link]";
+
   const baseIntro = `Hi, I came across ${lead.businessName || "your business"} and wanted to share something that could help you manage customers, sales, operations and follow-ups more smoothly.`;
+
   const productLine = `I build AI-powered business software, and for your type of business I think ${product} could be useful.`;
-  const proofLine = `${proofLine}
+
+  const proofLine = `Portfolio: ${portfolio}
+LinkedIn: ${linkedin}
 Resume: ${resume}`;
 
   if (mode === "email_pitch") {
@@ -563,7 +567,6 @@ ${productLine}
 I can help with custom software such as POS systems, AI chatbots, lead management tools, websites, dashboards and automation systems.
 
 ${proofLine}
-LinkedIn: ${linkedin}
 
 If you are open to it, I can share a quick demo or explain how this can help your business.
 
@@ -586,18 +589,21 @@ If you are open to it, I can share a short demo.`;
 
 Aap ke business ke liye ${product} useful ho sakta hai because it can help manage customers, sales, orders and follow-ups.
 
-Portfolio: ${portfolio}
-Resume: ${resume}
+${proofLine}
 
 Agar aap interested hon to main quick demo share kar sakta hoon.`;
   }
 
   if (mode === "follow_up") {
-    return `Hi, just following up on my previous message. I wanted to check if you would be open to seeing a quick demo of ${product}. It may help ${lead.businessName || "your business"} manage customers, sales and operations more smoothly.`;
+    return `Hi, just following up on my previous message. I wanted to check if you would be open to seeing a quick demo of ${product}. It may help ${lead.businessName || "your business"} manage customers, sales and operations more smoothly.
+
+${proofLine}`;
   }
 
   if (mode === "final_reminder") {
-    return `Hi, this is my final follow-up. I build AI-powered business software and thought ${product} could be useful for ${lead.businessName || "your business"}. If now is not the right time, no problem at all. Wishing you success.`;
+    return `Hi, this is my final follow-up. I build AI-powered business software and thought ${product} could be useful for ${lead.businessName || "your business"}. If now is not the right time, no problem at all. Wishing you success.
+
+${proofLine}`;
   }
 
   if (mode === "call_script") {
@@ -606,7 +612,11 @@ Hello, am I speaking with ${lead.contactPerson || "the owner/manager"} of ${lead
 
 My name is ${profile.fullName || "Shahzaib Ali"}. I build business software and AI automation tools. I wanted to ask if you currently use any system to manage customers, sales, orders, staff or follow-ups.
 
-For your business, I believe ${product} could help. Would you be open to a quick demo?`;
+For your business, I believe ${product} could help. Would you be open to a quick demo?
+
+Portfolio: ${portfolio}
+LinkedIn: ${linkedin}
+Resume: ${resume}`;
   }
 
   return `${baseIntro}
@@ -1732,3 +1742,4 @@ app.listen(PORT, () => {
   console.log(`Phase: 2 Safe Public Discovery`);
   console.log(`Database mode: ${useSupabase ? "Supabase/PostgreSQL" : "Local JSON fallback"}`);
 });
+

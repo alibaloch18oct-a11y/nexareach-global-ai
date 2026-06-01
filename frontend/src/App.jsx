@@ -177,7 +177,7 @@ export default function App() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || data.details || `Request failed ${res.status}`);
+      if (!res.ok) throw new Error(data.details || data.error || `Request failed ${res.status}`);
       return data;
     } catch (error) {
       throw new Error(`${error.message}. Current API: ${API}`);
@@ -1473,3 +1473,4 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
