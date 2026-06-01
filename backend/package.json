@@ -1,7 +1,7 @@
 {
-  "name": "nexareach-global-ai-backend",
-  "version": "2.0.0",
-  "description": "NexaReach Global AI backend",
+  "name": "nexareach-ai-pro-backend",
+  "version": "3.0.0",
+  "description": "NexaReach AI Pro Global AutoClient Hunter backend",
   "main": "server.js",
   "type": "module",
   "engines": {
@@ -14,6 +14,7 @@
     "generate:all": "node scripts/generate_all_global_csvs.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",

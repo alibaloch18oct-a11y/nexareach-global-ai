@@ -4,10 +4,10 @@ import {
   Building2,
   CheckCircle2,
   Copy,
+  Download,
   ExternalLink,
   Globe2,
   LayoutDashboard,
-  Link as LinkIcon,
   Loader2,
   Mail,
   MapPin,
@@ -30,68 +30,89 @@ import {
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const countryCityMap = {
-  "All Countries": ["All Cities"],
-  Pakistan: ["All Cities", "Karachi", "Lahore", "Islamabad", "Hyderabad", "Rawalpindi", "Faisalabad"],
-  "United Arab Emirates": ["All Cities", "Dubai", "Abu Dhabi", "Sharjah", "Ajman"],
-  "Saudi Arabia": ["All Cities", "Riyadh", "Jeddah", "Dammam", "Makkah", "Madinah"],
-  Qatar: ["All Cities", "Doha", "Al Rayyan"],
-  Malaysia: ["All Cities", "Kuala Lumpur", "George Town", "Johor Bahru"],
-  "United Kingdom": ["All Cities", "London", "Manchester", "Birmingham", "Leeds"],
-  "United States": ["All Cities", "New York", "Los Angeles", "Chicago", "Houston"],
-  Canada: ["All Cities", "Toronto", "Vancouver", "Montreal", "Calgary"],
-  Australia: ["All Cities", "Sydney", "Melbourne", "Brisbane", "Perth"]
-};
+const countries = [
+  "All Countries",
+  "Pakistan",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Malaysia",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Australia",
+  "Germany",
+  "France",
+  "Italy",
+  "Spain",
+  "Netherlands",
+  "Any Country"
+];
 
-const categories = [
-  "business",
+const statuses = [
+  "All",
+  "New",
+  "Message Generated",
+  "Sent",
+  "Replied",
+  "Interested",
+  "Demo Booked",
+  "Follow Up",
+  "Closed Won",
+  "Lost",
+  "Not Interested",
+  "Ready to WhatsApp",
+  "Needs Phone"
+];
+
+const messageModes = [
+  ["short_whatsapp", "Short WhatsApp"],
+  ["international_formal", "International Formal"],
+  ["pakistani_friendly", "Pakistani Friendly"],
+  ["email_pitch", "Email Pitch"],
+  ["follow_up", "Follow-up"],
+  ["final_reminder", "Final Reminder"],
+  ["call_script", "Call Script"]
+];
+
+const defaultDiscoveryCategories = [
+  "restaurants",
   "software houses",
   "IT companies",
   "company offices",
-  "restaurants",
-  "cafes",
-  "banks",
-  "schools",
-  "clinics",
-  "hotels",
   "shops",
+  "mobile shops",
+  "clinics",
+  "schools",
+  "hotels",
   "real estate agencies",
-  "travel agencies"
+  "travel agencies",
+  "salons",
+  "repair shops"
 ];
 
-const fallbackProfile = {
-  fullName: "Shahzaib Ali",
-  title: "Information Technology Graduate | AI & Full Stack Developer",
-  email: "alibaloch18oct@gmail.com",
+const emptyLead = {
+  businessName: "",
+  contactPerson: "",
   phone: "",
   whatsapp: "",
-  location: "Pakistan",
-  portfolio: "",
-  linkedin: "",
-  github: "",
-  resumeUrl: "",
-  skills: "React, Node.js, AI Apps, Dashboards, Automation, JavaScript, Express",
-  projects:
-    "NexaAgent AI, Jarvis AI Assistant, School Management System, FBR AI Assistant, Portfolio Website",
-  bio: "I build AI-powered software, business automation tools, dashboards, and modern web applications."
-};
-
-const emptyLead = {
-  name: "",
-  category: "Business",
-  phone: "",
   email: "",
   website: "",
+  instagram: "",
+  facebook: "",
+  linkedin: "",
   country: "",
   city: "",
-  location: "",
-  address: "",
-  contactPerson: "",
+  category: "",
+  businessSize: "",
+  source: "Manual",
   notes: "",
-  priority: "Medium"
+  status: "New",
+  estimatedDealValue: 0,
+  conversationNotes: ""
 };
 
-function makeWhatsAppUrl(phone, message) {
+function whatsappUrl(phone, message) {
   if (!phone || !message) return "";
   let clean = String(phone).replace(/[^\d]/g, "");
   if (clean.startsWith("00")) clean = clean.slice(2);
@@ -99,84 +120,64 @@ function makeWhatsAppUrl(phone, message) {
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
 }
 
-function safeMessageFromError(error) {
-  if (!error) return "Unknown error";
-  if (typeof error === "string") return error;
-  return error.message || "Unknown error";
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [profile, setProfile] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [leads, setLeads] = useState([]);
+  const [leadMeta, setLeadMeta] = useState({ total: 0, page: 1, totalPages: 1, limit: 50 });
+  const [counts, setCounts] = useState({});
   const [logs, setLogs] = useState([]);
-  const [counts, setCounts] = useState({
-    total: 0,
-    readyToWhatsApp: 0,
-    needsPhone: 0,
-    sent: 0
-  });
-
-  const [leadForm, setLeadForm] = useState(emptyLead);
+  const [followups, setFollowups] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
-  const [goal, setGoal] = useState("business");
-  const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [csvImporting, setCsvImporting] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [backendWarning, setBackendWarning] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-
+  const [leadForm, setLeadForm] = useState(emptyLead);
+  const [replyText, setReplyText] = useState("");
+  const [replyResult, setReplyResult] = useState(null);
+  const [messageMode, setMessageMode] = useState("short_whatsapp");
   const [selectedCountry, setSelectedCountry] = useState("All Countries");
   const [selectedCity, setSelectedCity] = useState("All Cities");
-
-  const [importCountry, setImportCountry] = useState("United Arab Emirates");
-  const [importCity, setImportCity] = useState("Dubai");
-  const [importCategory, setImportCategory] = useState("software houses");
-  const [searchLinks, setSearchLinks] = useState(null);
-
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
-  const [leadMeta, setLeadMeta] = useState({
-    total: 0,
-    totalPages: 1,
-    page: 1,
-    limit: 50
-  });
+  const [notice, setNotice] = useState("");
+  const [backendWarning, setBackendWarning] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [csvImporting, setCsvImporting] = useState(false);
+
+  const [discoveryCountry, setDiscoveryCountry] = useState("United Arab Emirates");
+  const [discoveryCity, setDiscoveryCity] = useState("Dubai");
+  const [discoveryCategory, setDiscoveryCategory] = useState("restaurants");
+  const [discoveryLimit, setDiscoveryLimit] = useState(100);
+  const [discoveryCategories, setDiscoveryCategories] = useState(defaultDiscoveryCategories);
+  const [discoveredLeads, setDiscoveredLeads] = useState([]);
+  const [discoveryReport, setDiscoveryReport] = useState(null);
+  const [selectedDiscoveryIds, setSelectedDiscoveryIds] = useState({});
 
   async function api(path, options = {}) {
-    const url = `${API}${path}`;
-
-    let response;
     try {
-      response = await fetch(url, {
+      const res = await fetch(`${API}${path}`, {
         headers: {
           "Content-Type": "application/json",
           ...(options.headers || {})
         },
         ...options
       });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.details || `Request failed ${res.status}`);
+      return data;
     } catch (error) {
-      throw new Error(
-        `Backend not reachable. Check VITE_API_URL in Vercel or backend URL. Current API: ${API}`
-      );
+      throw new Error(`${error.message}. Current API: ${API}`);
     }
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.error || data.details || `Request failed: ${response.status}`);
-    }
-
-    return data;
   }
 
   function notify(message) {
     setNotice(message);
-    setTimeout(() => setNotice(""), 7000);
+    setTimeout(() => setNotice(""), 6500);
   }
 
-  function buildLeadQuery(customPage = page) {
+  function query(customPage = page) {
     const params = new URLSearchParams({
       page: String(customPage),
       limit: "50",
@@ -185,64 +186,64 @@ export default function App() {
       status: statusFilter,
       q: searchText
     });
-
     return params.toString();
+  }
+
+  async function loadBase() {
+    try {
+      const [profileData, productData, dashData, logsData, followupData, cats] = await Promise.all([
+        api("/api/profile"),
+        api("/api/products"),
+        api("/api/dashboard"),
+        api("/api/logs"),
+        api("/api/followups"),
+        api("/api/discovery/categories")
+      ]);
+
+      setProfile(profileData);
+      setProducts(productData);
+      setDashboard(dashData);
+      setLogs(logsData);
+      setFollowups(followupData);
+      setDiscoveryCategories(cats || defaultDiscoveryCategories);
+      setBackendWarning("");
+    } catch (error) {
+      setBackendWarning(error.message);
+      setProfile({
+        fullName: "Shahzaib Ali",
+        title: "Information Technology Graduate | AI & Full Stack Developer",
+        email: "alibaloch18oct@gmail.com",
+        phone: "",
+        whatsapp: "",
+        location: "Pakistan",
+        portfolio: "",
+        linkedin: "",
+        github: "",
+        resumeUrl: "",
+        skills: "",
+        projects: "",
+        bio: ""
+      });
+    }
   }
 
   async function loadLeads(customPage = page) {
     try {
-      const data = await api(`/api/leads?${buildLeadQuery(customPage)}`);
-
+      const data = await api(`/api/leads?${query(customPage)}`);
       setLeads(data.items || []);
       setLeadMeta({
         total: data.total || 0,
-        totalPages: data.totalPages || 1,
         page: data.page || 1,
+        totalPages: data.totalPages || 1,
         limit: data.limit || 50
       });
       setCounts(data.counts || {});
       setBackendWarning("");
     } catch (error) {
-      console.error("Lead loading failed:", error);
-
+      setBackendWarning(error.message);
       setLeads([]);
-      setLeadMeta({
-        total: 0,
-        totalPages: 1,
-        page: 1,
-        limit: 50
-      });
-      setCounts({
-        total: 0,
-        readyToWhatsApp: 0,
-        needsPhone: 0,
-        sent: 0
-      });
-
-      setBackendWarning(
-        `Could not load leads. ${safeMessageFromError(error)}`
-      );
-    }
-  }
-
-  async function loadBase() {
-    try {
-      const [profileData, logsData] = await Promise.all([
-        api("/api/profile"),
-        api("/api/logs")
-      ]);
-
-      setProfile(profileData || fallbackProfile);
-      setLogs(Array.isArray(logsData) ? logsData : []);
-      setBackendWarning("");
-    } catch (error) {
-      console.error("Backend connection failed:", error);
-
-      setProfile(fallbackProfile);
-      setLogs([]);
-      setBackendWarning(
-        `Backend connection failed. App opened in safe mode. ${safeMessageFromError(error)}`
-      );
+      setLeadMeta({ total: 0, page: 1, totalPages: 1, limit: 50 });
+      setCounts({});
     }
   }
 
@@ -251,36 +252,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!profile) return;
-
-    const timeout = setTimeout(() => {
-      loadLeads(1);
+    const timer = setTimeout(() => {
       setPage(1);
+      loadLeads(1);
     }, 300);
 
-    return () => clearTimeout(timeout);
-  }, [selectedCountry, selectedCity, statusFilter, searchText, profile]);
+    return () => clearTimeout(timer);
+  }, [selectedCountry, selectedCity, statusFilter, searchText]);
 
   useEffect(() => {
-    if (!profile) return;
     loadLeads(page);
   }, [page]);
-
-  const availableCities = countryCityMap[selectedCountry] || ["All Cities"];
-  const importCities = countryCityMap[importCountry]?.filter((city) => city !== "All Cities") || [];
-
-  function handleCountryChange(country) {
-    setSelectedCountry(country);
-    setSelectedCity("All Cities");
-    setSelectedLead(null);
-    setPage(1);
-  }
-
-  function handleImportCountryChange(country) {
-    setImportCountry(country);
-    const firstCity = countryCityMap[country]?.find((city) => city !== "All Cities") || "";
-    setImportCity(firstCity);
-  }
 
   async function saveProfile() {
     setLoading(true);
@@ -292,167 +274,32 @@ export default function App() {
       setProfile(updated);
       notify("Profile saved.");
     } catch (error) {
-      notify(safeMessageFromError(error));
-    }
-    setLoading(false);
-  }
-
-  async function uploadResume(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setLoading(true);
-    const formData = new FormData();
-    formData.append("resume", file);
-
-    try {
-      const response = await fetch(`${API}/api/upload/resume`, {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Upload failed");
-
-      setProfile((prev) => ({ ...prev, resumeUrl: data.resumeUrl }));
-      notify("Resume uploaded.");
-      await loadBase();
-    } catch (error) {
-      notify(safeMessageFromError(error));
-    }
-
-    setLoading(false);
-  }
-
-  async function importCsvFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setCsvImporting(true);
-    notify("Importing CSV file. Large files may take some time...");
-
-    const formData = new FormData();
-    formData.append("csv", file);
-
-    try {
-      const response = await fetch(`${API}/api/leads/import-csv`, {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || data.details || "CSV import failed");
-
-      notify(
-        `CSV imported: ${data.imported}. Ready WhatsApp: ${data.readyToWhatsApp}. Needs phone: ${data.needsPhone}. Duplicates skipped: ${data.skippedDuplicates}.`
-      );
-
-      await loadLeads(1);
-      setPage(1);
-    } catch (error) {
-      notify(safeMessageFromError(error));
-    }
-
-    setCsvImporting(false);
-    event.target.value = "";
-  }
-
-  async function importGlobalBusinesses() {
-    if (!importCity.trim() || !importCountry.trim()) {
-      notify("Country and city are required.");
-      return;
-    }
-
-    setImporting(true);
-    notify(`Importing ${importCategory} in ${importCity}, ${importCountry}...`);
-
-    try {
-      const data = await api("/api/import/global", {
-        method: "POST",
-        body: JSON.stringify({
-          city: importCity,
-          country: importCountry,
-          category: importCategory
-        })
-      });
-
-      notify(
-        `Imported ${data.imported} from ${data.city}, ${data.country}. Ready WhatsApp: ${data.readyToWhatsApp}. Needs phone: ${data.needsPhone}.`
-      );
-
-      setSelectedCountry(importCountry);
-      setSelectedCity(importCity);
-      setPage(1);
-      await loadLeads(1);
-    } catch (error) {
-      notify(safeMessageFromError(error));
-    }
-
-    setImporting(false);
-  }
-
-  async function clearAllLeads() {
-    const confirmDelete = window.confirm("This will delete all leads and logs. Continue?");
-    if (!confirmDelete) return;
-
-    setLoading(true);
-    try {
-      await api("/api/leads/clear-all", { method: "DELETE" });
-      setSelectedLead(null);
-      notify("All leads cleared.");
-      await loadLeads(1);
-      await loadBase();
-    } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
 
   async function addLead() {
-    if (!leadForm.name.trim()) {
-      notify("Business/company name is required.");
+    if (!leadForm.businessName.trim()) {
+      notify("Business name is required.");
       return;
     }
 
-    const finalLead = {
-      ...leadForm,
-      country: leadForm.country || selectedCountry.replace("All Countries", ""),
-      city: leadForm.city || selectedCity.replace("All Cities", ""),
-      location:
-        leadForm.location ||
-        [
-          leadForm.city || selectedCity.replace("All Cities", ""),
-          leadForm.country || selectedCountry.replace("All Countries", "")
-        ]
-          .filter(Boolean)
-          .join(", ")
-    };
-
     setLoading(true);
     try {
-      await api("/api/leads", {
+      const created = await api("/api/leads", {
         method: "POST",
-        body: JSON.stringify(finalLead)
+        body: JSON.stringify(leadForm)
       });
-      setLeadForm(emptyLead);
-      notify("Manual lead added.");
-      await loadLeads(1);
-      setPage(1);
-    } catch (error) {
-      notify(safeMessageFromError(error));
-    }
-    setLoading(false);
-  }
 
-  async function deleteLead(id) {
-    setLoading(true);
-    try {
-      await api(`/api/leads/${id}`, { method: "DELETE" });
-      if (selectedLead?.id === id) setSelectedLead(null);
-      notify("Lead deleted.");
-      await loadLeads(page);
+      setSelectedLead(created);
+      setLeadForm(emptyLead);
+      notify("Lead saved and scored.");
+      await loadLeads(1);
+      await loadBase();
+      setActiveTab("studio");
     } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
@@ -464,64 +311,97 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify(data)
       });
+
       setSelectedLead(updated);
       notify("Lead updated.");
       await loadLeads(page);
+      await loadBase();
     } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
 
-  async function generateMessage(lead) {
+  async function deleteLead(id) {
+    setLoading(true);
+    try {
+      await api(`/api/leads/${id}`, { method: "DELETE" });
+      if (selectedLead?.id === id) setSelectedLead(null);
+      notify("Lead deleted.");
+      await loadLeads(page);
+      await loadBase();
+    } catch (error) {
+      notify(error.message);
+    }
+    setLoading(false);
+  }
+
+  async function scoreLead(lead) {
+    setLoading(true);
+    try {
+      const updated = await api(`/api/leads/${lead.id}/score`, { method: "POST" });
+      setSelectedLead(updated);
+      notify(`Lead scored: ${updated.leadScore}/100 — ${updated.recommendedProduct}`);
+      await loadLeads(page);
+      await loadBase();
+    } catch (error) {
+      notify(error.message);
+    }
+    setLoading(false);
+  }
+
+  async function generateMessage(lead, mode = messageMode) {
     setLoading(true);
     try {
       const updated = await api(`/api/leads/${lead.id}/generate-message`, {
         method: "POST",
-        body: JSON.stringify({ goal })
+        body: JSON.stringify({ mode })
       });
 
       setSelectedLead(updated);
       notify("Message generated.");
       await loadLeads(page);
     } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
 
-  async function markSent(lead, channel = "WhatsApp") {
+  async function markSent(lead) {
     setLoading(true);
     try {
       const updated = await api(`/api/leads/${lead.id}/mark-sent`, {
         method: "POST",
-        body: JSON.stringify({ channel })
+        body: JSON.stringify({ channel: "WhatsApp" })
       });
+
       setSelectedLead(updated);
-      notify("Marked as sent.");
+      notify("Marked as sent. Follow-up scheduled.");
       await loadLeads(page);
       await loadBase();
     } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
 
-  async function createSearchLinks() {
+  async function analyzeReply() {
+    if (!selectedLead || !replyText.trim()) return;
+
     setLoading(true);
     try {
-      const data = await api("/api/search-links", {
+      const result = await api(`/api/leads/${selectedLead.id}/analyze-reply`, {
         method: "POST",
-        body: JSON.stringify({
-          city: importCity,
-          country: importCountry,
-          category: importCategory
-        })
+        body: JSON.stringify({ reply: replyText })
       });
-      setSearchLinks(data);
-      notify("Search links ready.");
+
+      setReplyResult(result);
+      setSelectedLead(result.lead);
+      notify("Reply analyzed.");
+      await loadLeads(page);
+      await loadBase();
     } catch (error) {
-      notify(safeMessageFromError(error));
+      notify(error.message);
     }
     setLoading(false);
   }
@@ -532,27 +412,160 @@ export default function App() {
     notify("Message copied.");
   }
 
-  const activeWhatsAppUrl =
-    selectedLead?.whatsappUrl || makeWhatsAppUrl(selectedLead?.phone, selectedLead?.lastMessage);
+  async function importCsv(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setCsvImporting(true);
+    const form = new FormData();
+    form.append("csv", file);
+
+    try {
+      const res = await fetch(`${API}/api/leads/import-csv`, {
+        method: "POST",
+        body: form
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.details || "CSV import failed");
+
+      notify(`Imported ${data.imported}. Skipped duplicates: ${data.skippedDuplicates}.`);
+      await loadLeads(1);
+      await loadBase();
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setCsvImporting(false);
+    event.target.value = "";
+  }
+
+  async function runDiscoverySearch() {
+    if (!discoveryCountry.trim() || !discoveryCity.trim()) {
+      notify("Country and city are required.");
+      return;
+    }
+
+    setLoading(true);
+    setDiscoveryReport(null);
+    setDiscoveredLeads([]);
+    setSelectedDiscoveryIds({});
+
+    try {
+      const data = await api("/api/discovery/search", {
+        method: "POST",
+        body: JSON.stringify({
+          country: discoveryCountry,
+          city: discoveryCity,
+          category: discoveryCategory,
+          limit: Number(discoveryLimit || 100)
+        })
+      });
+
+      setDiscoveredLeads(data.leads || []);
+      setDiscoveryReport(data);
+      const selected = {};
+      (data.leads || []).forEach((lead) => {
+        selected[lead.id] = true;
+      });
+      setSelectedDiscoveryIds(selected);
+      notify(`Discovery found ${data.found} leads in ${data.city}, ${data.country}.`);
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+  }
+
+  async function importDiscoveredLeads(onlySelected = true) {
+    const leadsToImport = onlySelected
+      ? discoveredLeads.filter((lead) => selectedDiscoveryIds[lead.id])
+      : discoveredLeads;
+
+    if (!leadsToImport.length) {
+      notify("No discovery leads selected.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await api("/api/discovery/import", {
+        method: "POST",
+        body: JSON.stringify({ leads: leadsToImport })
+      });
+
+      notify(`Imported ${data.imported}. Skipped duplicates: ${data.skippedDuplicates}.`);
+      await loadLeads(1);
+      await loadBase();
+      setSelectedCountry(discoveryCountry);
+      setSelectedCity(discoveryCity);
+    } catch (error) {
+      notify(error.message);
+    }
+    setLoading(false);
+  }
+
+  async function runDiscoveryCampaign() {
+    if (!discoveryCountry.trim() || !discoveryCity.trim()) {
+      notify("Country and city are required.");
+      return;
+    }
+
+    const campaignCategories = [
+      "restaurants",
+      "shops",
+      "clinics",
+      "schools",
+      "hotels",
+      "real estate agencies",
+      "travel agencies",
+      "salons"
+    ];
+
+    setLoading(true);
+    try {
+      const data = await api("/api/discovery/campaign", {
+        method: "POST",
+        body: JSON.stringify({
+          country: discoveryCountry,
+          city: discoveryCity,
+          categories: campaignCategories
+        })
+      });
+
+      setDiscoveryReport({
+        ...data,
+        found: data.report?.reduce((sum, item) => sum + Number(item.found || 0), 0) || 0,
+        leads: []
+      });
+
+      notify("Campaign discovery completed.");
+      await loadLeads(1);
+      await loadBase();
+      setSelectedCountry(discoveryCountry);
+      setSelectedCity(discoveryCity);
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+  }
 
   const tabs = [
-    { id: "dashboard", label: "Command", icon: LayoutDashboard },
-    { id: "profile", label: "Profile", icon: User },
-    { id: "global", label: "Global Finder", icon: Globe2 },
-    { id: "leads", label: "CRM", icon: Building2 },
-    { id: "studio", label: "AI Studio", icon: Brain },
-    { id: "logs", label: "Logs", icon: Zap }
+    ["dashboard", "Command", LayoutDashboard],
+    ["discover", "Discover", Globe2],
+    ["leads", "Lead CRM", Building2],
+    ["add", "Add/Import", Plus],
+    ["studio", "AI Studio", Brain],
+    ["followups", "Follow-ups", Target],
+    ["products", "Products", Sparkles],
+    ["profile", "Profile", User],
+    ["logs", "Logs", Zap]
   ];
 
-  if (!profile) {
-    return (
-      <div className="loading-screen">
-        <Loader2 className="spin" size={46} />
-        <h1>NexaReach Global AI</h1>
-        <p>Starting app...</p>
-      </div>
-    );
-  }
+  const openWhatsapp = selectedLead
+    ? whatsappUrl(selectedLead.whatsapp || selectedLead.phone, selectedLead.lastMessage)
+    : "";
 
   return (
     <div className="app-shell">
@@ -562,54 +575,43 @@ export default function App() {
             <Rocket size={24} />
           </div>
           <div>
-            <h1>NexaReach Global AI</h1>
-            <p>Fast Outreach CRM</p>
+            <h1>NexaReach AI Pro</h1>
+            <p>Global AutoClient Hunter</p>
           </div>
         </div>
 
         <nav className="nav">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={activeTab === tab.id ? "nav-btn active" : "nav-btn"}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <Icon size={18} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {tabs.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={activeTab === id ? "nav-btn active" : "nav-btn"}
+              onClick={() => setActiveTab(id)}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
 
         <div className="side-card">
-          <Sparkles size={20} />
-          <h3>Active API</h3>
-          <p>{API}</p>
-        </div>
-
-        <div className="side-card">
           <Globe2 size={20} />
-          <h3>Fast Mode</h3>
-          <p>
-            Showing 50 leads per page. Active: {selectedCountry} / {selectedCity}
-          </p>
+          <h3>Phase 2</h3>
+          <p>Safe public discovery + global CRM. API: {API}</p>
         </div>
       </aside>
 
       <main className="main">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Paginated Global Outreach</p>
-            <h2>{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
+            <p className="eyebrow">Global AI Sales Command Center</p>
+            <h2>{tabs.find((tab) => tab[0] === activeTab)?.[1]}</h2>
           </div>
 
           <div className="global-filter">
             <label>
               <span>Country</span>
-              <select value={selectedCountry} onChange={(e) => handleCountryChange(e.target.value)}>
-                {Object.keys(countryCityMap).map((country) => (
+              <select value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value)}>
+                {countries.map((country) => (
                   <option key={country}>{country}</option>
                 ))}
               </select>
@@ -617,48 +619,36 @@ export default function App() {
 
             <label>
               <span>City</span>
-              <select
+              <input
                 value={selectedCity}
-                onChange={(e) => {
-                  setSelectedCity(e.target.value);
-                  setSelectedLead(null);
-                  setPage(1);
-                }}
-              >
-                {availableCities.map((city) => (
-                  <option key={city}>{city}</option>
-                ))}
-              </select>
+                onChange={(e) => setSelectedCity(e.target.value || "All Cities")}
+              />
             </label>
 
-            <button className="ghost-btn" onClick={() => loadLeads(page)}>
+            <button className="ghost-btn" onClick={() => { loadBase(); loadLeads(page); }}>
               <RefreshCcw size={17} />
               Refresh
             </button>
           </div>
         </header>
 
-        {backendWarning && (
-          <div className="notice danger-notice">
-            {backendWarning}
-          </div>
-        )}
-
+        {backendWarning && <div className="notice danger-notice">{backendWarning}</div>}
         {notice && <div className="notice">{notice}</div>}
 
         {activeTab === "dashboard" && (
           <section className="page">
-            <div className="hero-card global-hero">
+            <div className="hero-card">
               <div>
-                <p className="eyebrow">NexaReach Global AI</p>
-                <h1>Fast global outreach without loading crashes.</h1>
+                <p className="eyebrow">AI Daily Sales Mission</p>
+                <h1>NexaReach AI Pro — Global AutoClient Hunter</h1>
                 <p>
-                  This version opens even if the backend is unreachable. Check the API shown in the sidebar if you see connection warnings.
+                  {dashboard?.mission ||
+                    "Find public leads, score them, match products, generate messages, and follow up professionally."}
                 </p>
                 <div className="hero-actions">
-                  <button className="primary-btn" onClick={() => setActiveTab("global")}>
-                    <Target size={18} />
-                    Import Leads
+                  <button className="primary-btn" onClick={() => setActiveTab("discover")}>
+                    <Globe2 size={18} />
+                    Discover Leads
                   </button>
                   <button className="secondary-btn" onClick={() => setActiveTab("leads")}>
                     <Building2 size={18} />
@@ -676,165 +666,136 @@ export default function App() {
             </div>
 
             <div className="stats-grid">
-              <Stat title="Filtered Leads" value={counts.total || 0} icon={Building2} />
-              <Stat title="Ready WhatsApp" value={counts.readyToWhatsApp || 0} icon={MessageCircle} />
-              <Stat title="Needs Phone" value={counts.needsPhone || 0} icon={Phone} />
-              <Stat title="Sent" value={counts.sent || 0} icon={Send} />
+              <Stat title="Total Leads" value={dashboard?.total || counts.total || 0} icon={Building2} />
+              <Stat title="Hot Leads" value={dashboard?.hot || 0} icon={Target} />
+              <Stat title="Interested" value={dashboard?.interested || 0} icon={CheckCircle2} />
+              <Stat title="Estimated Revenue" value={dashboard?.estimatedRevenue || 0} icon={Zap} />
             </div>
           </section>
         )}
 
-        {activeTab === "profile" && (
-          <section className="page">
-            <div className="panel">
-              <div className="section-head">
-                <div>
-                  <p className="eyebrow">Your global profile</p>
-                  <h3>Profile Vault</h3>
-                </div>
-                <button className="primary-btn" onClick={saveProfile} disabled={loading}>
-                  <Save size={17} />
-                  Save
-                </button>
-              </div>
-
-              <div className="form-grid">
-                <Input label="Full Name" value={profile.fullName} onChange={(v) => setProfile({ ...profile, fullName: v })} />
-                <Input label="Title" value={profile.title} onChange={(v) => setProfile({ ...profile, title: v })} />
-                <Input label="Email" value={profile.email} onChange={(v) => setProfile({ ...profile, email: v })} />
-                <Input label="Phone" value={profile.phone} onChange={(v) => setProfile({ ...profile, phone: v })} />
-                <Input label="WhatsApp" value={profile.whatsapp} onChange={(v) => setProfile({ ...profile, whatsapp: v })} />
-                <Input label="Location" value={profile.location} onChange={(v) => setProfile({ ...profile, location: v })} />
-                <Input label="Portfolio Link" value={profile.portfolio} onChange={(v) => setProfile({ ...profile, portfolio: v })} />
-                <Input label="LinkedIn Link" value={profile.linkedin} onChange={(v) => setProfile({ ...profile, linkedin: v })} />
-                <Input label="GitHub Link" value={profile.github} onChange={(v) => setProfile({ ...profile, github: v })} />
-              </div>
-
-              <Textarea label="Skills" value={profile.skills} onChange={(v) => setProfile({ ...profile, skills: v })} />
-              <Textarea label="Projects" value={profile.projects} onChange={(v) => setProfile({ ...profile, projects: v })} />
-              <Textarea label="Bio" value={profile.bio} onChange={(v) => setProfile({ ...profile, bio: v })} />
-
-              <div className="upload-box">
-                <div>
-                  <h4>Resume</h4>
-                  <p>{profile.resumeUrl || "No resume uploaded yet."}</p>
-                </div>
-                <label className="upload-btn">
-                  <Upload size={18} />
-                  Upload Resume
-                  <input hidden type="file" accept=".pdf,.doc,.docx" onChange={uploadResume} />
-                </label>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {activeTab === "global" && (
+        {activeTab === "discover" && (
           <section className="page two-col">
             <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">Import by country/city</p>
-                  <h3>Global Lead Finder</h3>
+                  <p className="eyebrow">Safe Public Lead Discovery</p>
+                  <h3>Find Global Businesses</h3>
                 </div>
               </div>
 
-              <label className="field">
-                <span>Import Country</span>
-                <select value={importCountry} onChange={(e) => handleImportCountryChange(e.target.value)}>
-                  {Object.keys(countryCityMap)
-                    .filter((country) => country !== "All Countries")
-                    .map((country) => (
-                      <option key={country}>{country}</option>
+              <div className="form-grid single">
+                <Input label="Country" value={discoveryCountry} onChange={setDiscoveryCountry} />
+                <Input label="City" value={discoveryCity} onChange={setDiscoveryCity} />
+
+                <label className="field">
+                  <span>Category</span>
+                  <select value={discoveryCategory} onChange={(e) => setDiscoveryCategory(e.target.value)}>
+                    {discoveryCategories.map((category) => (
+                      <option key={category}>{category}</option>
                     ))}
-                </select>
-              </label>
+                  </select>
+                </label>
 
-              <label className="field">
-                <span>Import City</span>
-                <select value={importCity} onChange={(e) => setImportCity(e.target.value)}>
-                  {importCities.map((city) => (
-                    <option key={city}>{city}</option>
-                  ))}
-                </select>
-              </label>
+                <Input label="Limit" value={discoveryLimit} onChange={setDiscoveryLimit} />
+              </div>
 
-              <label className="field">
-                <span>Category</span>
-                <select value={importCategory} onChange={(e) => setImportCategory(e.target.value)}>
-                  {categories.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-
-              <button className="primary-btn full" onClick={importGlobalBusinesses} disabled={importing}>
-                {importing ? <Loader2 className="spin" size={18} /> : <Globe2 size={18} />}
-                {importing ? "Importing Leads..." : "Import Country/City Leads"}
+              <button className="primary-btn full" onClick={runDiscoverySearch} disabled={loading}>
+                {loading ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
+                Search Public Leads
               </button>
 
-              <label className="secondary-btn full">
-                <Upload size={18} />
-                {csvImporting ? "Importing CSV..." : "Import CSV File"}
-                <input hidden type="file" accept=".csv" onChange={importCsvFile} />
-              </label>
-
-              <button className="ghost-btn full" onClick={createSearchLinks}>
-                <Search size={18} />
-                Create Search Links
+              <button className="secondary-btn full" onClick={runDiscoveryCampaign} disabled={loading}>
+                <Rocket size={18} />
+                Auto Campaign: Import Multiple Categories
               </button>
 
-              <button className="danger-btn full" onClick={clearAllLeads} disabled={loading}>
-                <Trash2 size={18} />
-                Delete All Leads
-              </button>
-
-              {searchLinks && (
-                <div className="search-links">
-                  <a href={searchLinks.maps} target="_blank" rel="noreferrer">
-                    <MapPin size={17} />
-                    Google Maps
-                    <ExternalLink size={14} />
-                  </a>
-                  <a href={searchLinks.google} target="_blank" rel="noreferrer">
-                    <Globe2 size={17} />
-                    Google Search
-                    <ExternalLink size={14} />
-                  </a>
-                  <a href={searchLinks.facebook} target="_blank" rel="noreferrer">
-                    <LinkIcon size={17} />
-                    Facebook Pages
-                    <ExternalLink size={14} />
-                  </a>
-                  <a href={searchLinks.linkedin} target="_blank" rel="noreferrer">
-                    <LinkIcon size={17} />
-                    LinkedIn Companies
-                    <ExternalLink size={14} />
-                  </a>
+              {discoveryReport && (
+                <div className="ai-box">
+                  <h4>Discovery Report</h4>
+                  <p><b>Country:</b> {discoveryReport.country}</p>
+                  <p><b>City:</b> {discoveryReport.city}</p>
+                  <p><b>Category:</b> {discoveryReport.category || "Campaign"}</p>
+                  <p><b>Found:</b> {discoveryReport.found}</p>
+                  {discoveryReport.location && <p><b>Location:</b> {discoveryReport.location}</p>}
+                  {discoveryReport.report && (
+                    <div>
+                      {discoveryReport.report.map((item) => (
+                        <p key={item.category}>
+                          <b>{item.category}:</b> found {item.found}, imported {item.imported}, skipped {item.skippedDuplicates}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             <div className="panel">
-              <h3>Add Manual Lead</h3>
+              <div className="section-head">
+                <div>
+                  <p className="eyebrow">Preview Before Saving</p>
+                  <h3>Discovered Leads</h3>
+                  <p className="muted-line">{discoveredLeads.length} leads ready for review</p>
+                </div>
 
-              <div className="form-grid single">
-                <Input label="Business / Company Name" value={leadForm.name} onChange={(v) => setLeadForm({ ...leadForm, name: v })} />
-                <Input label="Category" value={leadForm.category} onChange={(v) => setLeadForm({ ...leadForm, category: v })} />
-                <Input label="Country" value={leadForm.country} onChange={(v) => setLeadForm({ ...leadForm, country: v })} />
-                <Input label="City" value={leadForm.city} onChange={(v) => setLeadForm({ ...leadForm, city: v })} />
-                <Input label="Phone / WhatsApp" value={leadForm.phone} onChange={(v) => setLeadForm({ ...leadForm, phone: v })} />
-                <Input label="Email" value={leadForm.email} onChange={(v) => setLeadForm({ ...leadForm, email: v })} />
-                <Input label="Website" value={leadForm.website} onChange={(v) => setLeadForm({ ...leadForm, website: v })} />
-                <Input label="Address" value={leadForm.address} onChange={(v) => setLeadForm({ ...leadForm, address: v })} />
+                <div className="top-actions">
+                  <button className="primary-btn" onClick={() => importDiscoveredLeads(true)} disabled={!discoveredLeads.length || loading}>
+                    <Save size={17} />
+                    Import Selected
+                  </button>
+                  <button className="ghost-btn" onClick={() => importDiscoveredLeads(false)} disabled={!discoveredLeads.length || loading}>
+                    Import All
+                  </button>
+                </div>
               </div>
 
-              <Textarea label="Notes" value={leadForm.notes} onChange={(v) => setLeadForm({ ...leadForm, notes: v })} />
+              <div className="discovery-list">
+                {discoveredLeads.map((lead) => (
+                  <div className="discovery-card" key={lead.id}>
+                    <label className="discovery-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selectedDiscoveryIds[lead.id])}
+                        onChange={(e) =>
+                          setSelectedDiscoveryIds({
+                            ...selectedDiscoveryIds,
+                            [lead.id]: e.target.checked
+                          })
+                        }
+                      />
+                      <span>{lead.businessName}</span>
+                    </label>
 
-              <button className="primary-btn full" onClick={addLead}>
-                <Plus size={18} />
-                Save Lead
-              </button>
+                    <div className="badges">
+                      <span>{lead.category}</span>
+                      <span>{lead.leadScore}/100</span>
+                      <span>{lead.recommendedProduct}</span>
+                    </div>
+
+                    <p className="small-line"><MapPin size={13} /> {lead.notes}</p>
+                    <p className="small-line"><Phone size={13} /> {lead.whatsapp || lead.phone || "No phone in public data"}</p>
+                    <p className="small-line"><Mail size={13} /> {lead.email || "No email in public data"}</p>
+
+                    {lead.enrichmentLinks && (
+                      <div className="enrichment-row">
+                        <a href={lead.enrichmentLinks.google} target="_blank" rel="noreferrer">Google <ExternalLink size={12} /></a>
+                        <a href={lead.enrichmentLinks.maps} target="_blank" rel="noreferrer">Maps <ExternalLink size={12} /></a>
+                        <a href={lead.enrichmentLinks.facebook} target="_blank" rel="noreferrer">Facebook <ExternalLink size={12} /></a>
+                        <a href={lead.enrichmentLinks.linkedin} target="_blank" rel="noreferrer">LinkedIn <ExternalLink size={12} /></a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {!discoveredLeads.length && (
+                  <div className="empty">
+                    <Globe2 size={44} />
+                    <h3>No discovered leads yet</h3>
+                    <p>Choose country, city, category and click Search Public Leads.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}
@@ -844,28 +805,20 @@ export default function App() {
             <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">Fast CRM</p>
-                  <h3>
-                    Leads: {selectedCountry} / {selectedCity}
-                  </h3>
-                  <p className="muted-line">
-                    Showing page {leadMeta.page} of {leadMeta.totalPages} · Total filtered: {leadMeta.total}
-                  </p>
+                  <p className="eyebrow">Global CRM</p>
+                  <h3>Leads · {leadMeta.total} found</h3>
+                  <p className="muted-line">Page {leadMeta.page} of {leadMeta.totalPages}</p>
                 </div>
 
                 <div className="top-actions">
                   <select className="search-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                    <option>All</option>
-                    <option>Ready to WhatsApp</option>
-                    <option>Needs Phone</option>
-                    <option>Sent</option>
-                    <option>Interested</option>
-                    <option>Follow Up</option>
+                    {statuses.map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
                   </select>
-
                   <input
                     className="search-input"
-                    placeholder="Search filtered leads..."
+                    placeholder="Search leads..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                   />
@@ -878,6 +831,7 @@ export default function App() {
                   setSelectedLead(lead);
                   setActiveTab("studio");
                 }}
+                onScore={scoreLead}
                 onGenerate={(lead) => {
                   setSelectedLead(lead);
                   setActiveTab("studio");
@@ -891,33 +845,61 @@ export default function App() {
           </section>
         )}
 
-        {activeTab === "studio" && (
-          <section className="page studio-layout">
-            <div className="panel lead-list-panel">
+        {activeTab === "add" && (
+          <section className="page two-col">
+            <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">Fast target list</p>
-                  <h3>{selectedCountry} / {selectedCity}</h3>
-                  <p className="muted-line">Page {leadMeta.page} of {leadMeta.totalPages}</p>
+                  <p className="eyebrow">Lead Import</p>
+                  <h3>CSV Import</h3>
                 </div>
               </div>
 
-              <input
-                className="search-input full-search"
-                placeholder="Search target..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
+              <label className="secondary-btn full">
+                <Upload size={18} />
+                {csvImporting ? "Importing..." : "Import CSV Leads"}
+                <input hidden type="file" accept=".csv" onChange={importCsv} />
+              </label>
 
-              <select className="search-input full-search" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option>All</option>
-                <option>Ready to WhatsApp</option>
-                <option>Needs Phone</option>
-                <option>Sent</option>
-                <option>Interested</option>
-                <option>Follow Up</option>
-              </select>
+              <a className="ghost-btn full" href={`${API}/api/export/leads.json`} target="_blank" rel="noreferrer">
+                <Download size={18} />
+                Export Backup JSON
+              </a>
+            </div>
 
+            <div className="panel">
+              <h3>Manual Global Lead</h3>
+              <div className="form-grid">
+                <Input label="Business Name" value={leadForm.businessName} onChange={(v) => setLeadForm({ ...leadForm, businessName: v })} />
+                <Input label="Contact Person" value={leadForm.contactPerson} onChange={(v) => setLeadForm({ ...leadForm, contactPerson: v })} />
+                <Input label="Phone" value={leadForm.phone} onChange={(v) => setLeadForm({ ...leadForm, phone: v })} />
+                <Input label="WhatsApp" value={leadForm.whatsapp} onChange={(v) => setLeadForm({ ...leadForm, whatsapp: v })} />
+                <Input label="Email" value={leadForm.email} onChange={(v) => setLeadForm({ ...leadForm, email: v })} />
+                <Input label="Website" value={leadForm.website} onChange={(v) => setLeadForm({ ...leadForm, website: v })} />
+                <Input label="Instagram" value={leadForm.instagram} onChange={(v) => setLeadForm({ ...leadForm, instagram: v })} />
+                <Input label="Facebook" value={leadForm.facebook} onChange={(v) => setLeadForm({ ...leadForm, facebook: v })} />
+                <Input label="LinkedIn" value={leadForm.linkedin} onChange={(v) => setLeadForm({ ...leadForm, linkedin: v })} />
+                <Input label="Country" value={leadForm.country} onChange={(v) => setLeadForm({ ...leadForm, country: v })} />
+                <Input label="City" value={leadForm.city} onChange={(v) => setLeadForm({ ...leadForm, city: v })} />
+                <Input label="Category" value={leadForm.category} onChange={(v) => setLeadForm({ ...leadForm, category: v })} />
+                <Input label="Business Size" value={leadForm.businessSize} onChange={(v) => setLeadForm({ ...leadForm, businessSize: v })} />
+                <Input label="Estimated Deal Value" value={leadForm.estimatedDealValue} onChange={(v) => setLeadForm({ ...leadForm, estimatedDealValue: v })} />
+              </div>
+
+              <Textarea label="Notes" value={leadForm.notes} onChange={(v) => setLeadForm({ ...leadForm, notes: v })} />
+
+              <button className="primary-btn full" onClick={addLead} disabled={loading}>
+                <Save size={18} />
+                Save & Score Lead
+              </button>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "studio" && (
+          <section className="page studio-layout">
+            <div className="panel lead-list-panel">
+              <h3>Current Page Leads</h3>
               <div className="picker-list">
                 {leads.map((lead) => (
                   <button
@@ -926,11 +908,10 @@ export default function App() {
                     onClick={() => setSelectedLead(lead)}
                   >
                     <Building2 size={16} />
-                    <span>{lead.name}</span>
+                    <span>{lead.businessName}</span>
                   </button>
                 ))}
               </div>
-
               <Pagination page={leadMeta.page} totalPages={leadMeta.totalPages} setPage={setPage} compact />
             </div>
 
@@ -939,42 +920,59 @@ export default function App() {
                 <div className="empty big-empty">
                   <Brain size={50} />
                   <h3>Select a lead</h3>
-                  <p>Only 50 leads are loaded at a time for speed.</p>
+                  <p>Choose a lead to score, match product, generate message and analyze replies.</p>
                 </div>
               ) : (
                 <>
                   <div className="section-head studio-head">
                     <div>
-                      <p className="eyebrow">{selectedLead.category}</p>
-                      <h3>{selectedLead.name}</h3>
+                      <p className="eyebrow">{selectedLead.category || "Business"}</p>
+                      <h3>{selectedLead.businessName}</h3>
+                      <p className="muted-line">
+                        Score: {selectedLead.leadScore || 0}/100 · {selectedLead.leadTemperature || "Cold"} · Product: {selectedLead.recommendedProduct || "Not scored"}
+                      </p>
                     </div>
 
                     <div className="top-actions">
-                      <select className="search-input" value={goal} onChange={(e) => setGoal(e.target.value)}>
-                        <option value="business">business</option>
-                        <option value="job">job</option>
+                      <select className="search-input" value={messageMode} onChange={(e) => setMessageMode(e.target.value)}>
+                        {messageModes.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
                       </select>
 
-                      <button className="primary-btn" onClick={() => generateMessage(selectedLead)} disabled={loading}>
-                        {loading ? <Loader2 className="spin" size={17} /> : <Wand2 size={17} />}
+                      <button className="secondary-btn" onClick={() => scoreLead(selectedLead)}>
+                        <Target size={17} />
+                        Score
+                      </button>
+
+                      <button className="primary-btn" onClick={() => generateMessage(selectedLead)}>
+                        <Wand2 size={17} />
                         Generate
                       </button>
                     </div>
                   </div>
 
                   <div className="lead-detail-strip">
-                    <span><Phone size={14} /> {selectedLead.phone || "No phone"}</span>
+                    <span><Phone size={14} /> {selectedLead.whatsapp || selectedLead.phone || "No phone"}</span>
                     <span><Mail size={14} /> {selectedLead.email || "No email"}</span>
-                    <span><MapPin size={14} /> {selectedLead.location || "Global"}</span>
+                    <span><MapPin size={14} /> {[selectedLead.city, selectedLead.country].filter(Boolean).join(", ") || "Global"}</span>
+                  </div>
+
+                  <div className="ai-box">
+                    <h4>AI Lead Intelligence</h4>
+                    <p><b>Problem:</b> {selectedLead.aiProblem || "Score lead to generate problem insight."}</p>
+                    <p><b>Why good:</b> {selectedLead.aiReason || "Score lead to generate reason."}</p>
+                    <p><b>Best angle:</b> {selectedLead.aiOutreachAngle || "Score lead to generate outreach angle."}</p>
+                    <p><b>Next action:</b> {selectedLead.nextAction || "Generate message or follow up."}</p>
                   </div>
 
                   <div className="message-box">
-                    {selectedLead.lastMessage || "No message generated yet. Click Generate."}
+                    {selectedLead.lastMessage || "No message generated yet."}
                   </div>
 
                   <div className="studio-actions">
-                    {activeWhatsAppUrl ? (
-                      <a className="whatsapp-btn" href={activeWhatsAppUrl} target="_blank" rel="noreferrer">
+                    {openWhatsapp ? (
+                      <a className="whatsapp-btn" href={openWhatsapp} target="_blank" rel="noreferrer">
                         <MessageCircle size={18} />
                         Open WhatsApp
                       </a>
@@ -985,39 +983,47 @@ export default function App() {
                       </button>
                     )}
 
-                    <button className="secondary-btn" onClick={copyMessage} disabled={!selectedLead.lastMessage}>
+                    <button className="secondary-btn" onClick={copyMessage}>
                       <Copy size={18} />
-                      Copy Message
+                      Copy
                     </button>
 
-                    <button className="ghost-btn" onClick={() => markSent(selectedLead, "WhatsApp")}>
+                    <button className="ghost-btn" onClick={() => markSent(selectedLead)}>
                       <Send size={18} />
                       Mark Sent
                     </button>
 
-                    <button className="ghost-btn" onClick={() => updateLead(selectedLead.id, { status: "Follow Up" })}>
-                      <RefreshCcw size={18} />
-                      Follow Up
+                    <button className="ghost-btn" onClick={() => updateLead(selectedLead.id, { status: "Replied" })}>
+                      <CheckCircle2 size={18} />
+                      Replied
                     </button>
 
                     <button className="ghost-btn" onClick={() => updateLead(selectedLead.id, { status: "Interested" })}>
-                      <CheckCircle2 size={18} />
+                      <Target size={18} />
                       Interested
+                    </button>
+
+                    <button className="danger-btn" onClick={() => updateLead(selectedLead.id, { status: "Not Interested" })}>
+                      Not Interested
                     </button>
                   </div>
 
                   <div className="edit-lead-box">
-                    <h4>Edit selected lead details</h4>
-                    <div className="form-grid">
-                      <Input label="Phone" value={selectedLead.phone} onChange={(v) => setSelectedLead({ ...selectedLead, phone: v })} />
-                      <Input label="Email" value={selectedLead.email} onChange={(v) => setSelectedLead({ ...selectedLead, email: v })} />
-                      <Input label="Website" value={selectedLead.website} onChange={(v) => setSelectedLead({ ...selectedLead, website: v })} />
-                      <Input label="Address" value={selectedLead.address} onChange={(v) => setSelectedLead({ ...selectedLead, address: v })} />
-                    </div>
-                    <button className="secondary-btn" onClick={() => updateLead(selectedLead.id, selectedLead)}>
-                      <Save size={17} />
-                      Save Lead Details
+                    <h4>Conversation Analyzer</h4>
+                    <Textarea label="Paste customer reply" value={replyText} onChange={setReplyText} />
+                    <button className="primary-btn" onClick={analyzeReply}>
+                      <Brain size={17} />
+                      Analyze Reply
                     </button>
+
+                    {replyResult && (
+                      <div className="ai-box">
+                        <p><b>Interest:</b> {replyResult.interestLevel}</p>
+                        <p><b>Status:</b> {replyResult.updatedStatus}</p>
+                        <p><b>Next:</b> {replyResult.nextAction}</p>
+                        <p><b>Best reply:</b> {replyResult.bestReply}</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1025,34 +1031,90 @@ export default function App() {
           </section>
         )}
 
-        {activeTab === "logs" && (
+        {activeTab === "followups" && (
+          <section className="page">
+            <div className="stats-grid">
+              <Stat title="Due Today" value={followups?.dueToday?.length || 0} icon={Target} />
+              <Stat title="Hot Leads" value={followups?.hotLeads?.length || 0} icon={Zap} />
+              <Stat title="Interested" value={followups?.interested?.length || 0} icon={CheckCircle2} />
+              <Stat title="Demo Booked" value={followups?.demoBooked?.length || 0} icon={MessageCircle} />
+            </div>
+
+            <FollowupSection title="Follow-ups Due Today" leads={followups?.dueToday || []} setSelectedLead={setSelectedLead} setActiveTab={setActiveTab} />
+            <FollowupSection title="Hot Leads" leads={followups?.hotLeads || []} setSelectedLead={setSelectedLead} setActiveTab={setActiveTab} />
+            <FollowupSection title="No Response" leads={followups?.noResponse || []} setSelectedLead={setSelectedLead} setActiveTab={setActiveTab} />
+          </section>
+        )}
+
+        {activeTab === "products" && (
+          <section className="page">
+            <div className="lead-grid">
+              {products.map((product) => (
+                <div className="lead-card" key={product.name}>
+                  <div className="lead-top">
+                    <div className="lead-icon"><Sparkles size={22} /></div>
+                    <div>
+                      <h4>{product.name}</h4>
+                      <p>{product.pitch}</p>
+                    </div>
+                  </div>
+                  <div className="badges">
+                    {product.categories.slice(0, 5).map((cat) => (
+                      <span key={cat}>{cat}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "profile" && profile && (
           <section className="page">
             <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">History</p>
-                  <h3>Activity Logs</h3>
+                  <p className="eyebrow">Your Sales Identity</p>
+                  <h3>Profile Vault</h3>
                 </div>
+                <button className="primary-btn" onClick={saveProfile}>
+                  <Save size={17} />
+                  Save
+                </button>
               </div>
 
+              <div className="form-grid">
+                <Input label="Full Name" value={profile.fullName} onChange={(v) => setProfile({ ...profile, fullName: v })} />
+                <Input label="Title" value={profile.title} onChange={(v) => setProfile({ ...profile, title: v })} />
+                <Input label="Email" value={profile.email} onChange={(v) => setProfile({ ...profile, email: v })} />
+                <Input label="Phone" value={profile.phone} onChange={(v) => setProfile({ ...profile, phone: v })} />
+                <Input label="WhatsApp" value={profile.whatsapp} onChange={(v) => setProfile({ ...profile, whatsapp: v })} />
+                <Input label="Portfolio" value={profile.portfolio} onChange={(v) => setProfile({ ...profile, portfolio: v })} />
+                <Input label="LinkedIn" value={profile.linkedin} onChange={(v) => setProfile({ ...profile, linkedin: v })} />
+                <Input label="GitHub" value={profile.github} onChange={(v) => setProfile({ ...profile, github: v })} />
+              </div>
+
+              <Textarea label="Skills" value={profile.skills} onChange={(v) => setProfile({ ...profile, skills: v })} />
+              <Textarea label="Projects" value={profile.projects} onChange={(v) => setProfile({ ...profile, projects: v })} />
+              <Textarea label="Bio" value={profile.bio} onChange={(v) => setProfile({ ...profile, bio: v })} />
+            </div>
+          </section>
+        )}
+
+        {activeTab === "logs" && (
+          <section className="page">
+            <div className="panel">
+              <h3>Activity Logs</h3>
               <div className="logs">
                 {logs.map((log) => (
                   <div className="log-row" key={log.id}>
                     <div>
                       <h4>{log.action}</h4>
-                      <p>{log.leadName} · {log.channel} · {log.location || "Global"}</p>
+                      <p>{log.lead_name || log.leadName} · {log.channel || ""}</p>
                     </div>
-                    <span>{new Date(log.createdAt).toLocaleString()}</span>
+                    <span>{new Date(log.created_at || log.createdAt).toLocaleString()}</span>
                   </div>
                 ))}
-
-                {logs.length === 0 && (
-                  <div className="empty">
-                    <Zap size={44} />
-                    <h3>No activity yet</h3>
-                    <p>Sent logs will appear here.</p>
-                  </div>
-                )}
               </div>
             </div>
           </section>
@@ -1062,13 +1124,13 @@ export default function App() {
   );
 }
 
-function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
+function LeadGrid({ leads, onSelect, onScore, onGenerate, onDelete }) {
   if (!leads.length) {
     return (
       <div className="empty">
         <Building2 size={44} />
         <h3>No leads found</h3>
-        <p>Change filters, check backend connection, or import leads from Global Finder.</p>
+        <p>Add leads manually, import CSV, run discovery, or change filters.</p>
       </div>
     );
   }
@@ -1079,34 +1141,36 @@ function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
         <div className="lead-card" key={lead.id}>
           <div onClick={() => onSelect(lead)} className="lead-click">
             <div className="lead-top">
-              <div className="lead-icon">
-                <Building2 size={22} />
-              </div>
+              <div className="lead-icon"><Building2 size={22} /></div>
               <div>
-                <h4>{lead.name}</h4>
-                <p>{lead.category}</p>
+                <h4>{lead.businessName}</h4>
+                <p>{lead.category || "Business"}</p>
               </div>
             </div>
 
             <div className="badges">
               <span>{lead.status}</span>
-              <span>{lead.source}</span>
-              <span>{lead.country || "Global"}</span>
-              <span>{lead.city || "All Cities"}</span>
+              <span>{lead.leadTemperature || "Cold"}</span>
+              <span>{lead.leadScore || 0}/100</span>
+              <span>{lead.recommendedProduct || "No product"}</span>
             </div>
 
             <p className="small-line">
-              <MapPin size={13} /> {lead.address || lead.location}
+              <MapPin size={13} /> {[lead.city, lead.country].filter(Boolean).join(", ") || "Global"}
             </p>
             <p className="small-line">
-              <Phone size={13} /> {lead.phone || "No phone in data"}
+              <Phone size={13} /> {lead.whatsapp || lead.phone || "No phone"}
             </p>
             <p className="small-line">
-              <Mail size={13} /> {lead.email || "No email in data"}
+              <Mail size={13} /> {lead.email || "No email"}
             </p>
           </div>
 
           <div className="card-actions">
+            <button className="mini-btn" onClick={() => onScore(lead)}>
+              <Target size={15} />
+              Score
+            </button>
             <button className="mini-btn" onClick={() => onGenerate(lead)}>
               <Wand2 size={15} />
               Generate
@@ -1124,25 +1188,41 @@ function LeadGrid({ leads, onSelect, onGenerate, onDelete }) {
 function Pagination({ page, totalPages, setPage, compact = false }) {
   return (
     <div className={compact ? "pagination compact" : "pagination"}>
-      <button
-        className="ghost-btn"
-        disabled={page <= 1}
-        onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-      >
+      <button className="ghost-btn" disabled={page <= 1} onClick={() => setPage((p) => Math.max(p - 1, 1))}>
         Prev
       </button>
-
-      <span>
-        Page {page} / {totalPages}
-      </span>
-
-      <button
-        className="ghost-btn"
-        disabled={page >= totalPages}
-        onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-      >
+      <span>Page {page} / {totalPages}</span>
+      <button className="ghost-btn" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(p + 1, totalPages))}>
         Next
       </button>
+    </div>
+  );
+}
+
+function FollowupSection({ title, leads, setSelectedLead, setActiveTab }) {
+  return (
+    <div className="panel" style={{ marginTop: 18 }}>
+      <h3>{title}</h3>
+      <div className="lead-grid">
+        {leads.slice(0, 12).map((lead) => (
+          <div
+            className="lead-card"
+            key={lead.id}
+            onClick={() => {
+              setSelectedLead(lead);
+              setActiveTab("studio");
+            }}
+          >
+            <h4>{lead.businessName}</h4>
+            <p>{lead.recommendedProduct}</p>
+            <div className="badges">
+              <span>{lead.status}</span>
+              <span>{lead.leadTemperature}</span>
+              <span>{lead.leadScore}/100</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

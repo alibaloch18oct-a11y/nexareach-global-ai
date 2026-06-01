@@ -924,3 +924,73 @@ a {
   background: linear-gradient(135deg, #ff4d6d, #ffcc70) !important;
   color: #18020a !important;
 }
+.ai-box {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(0, 240, 255, 0.07);
+  border: 1px solid rgba(0, 240, 255, 0.18);
+  color: #dce7ff;
+}
+
+.ai-box h4 {
+  margin: 0 0 10px;
+  color: #ffffff;
+}
+
+.ai-box p {
+  margin: 8px 0;
+  line-height: 1.55;
+}
+
+.danger-notice {
+  background: linear-gradient(135deg, #ff4d6d, #ffcc70) !important;
+  color: #18020a !important;
+}
+.discovery-list {
+  display: grid;
+  gap: 12px;
+  max-height: 72vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.discovery-card {
+  border-radius: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.discovery-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.discovery-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #00f0ff;
+}
+
+.enrichment-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.enrichment-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.1);
+  color: #dffbff;
+  font-size: 12px;
+  border: 1px solid rgba(0, 240, 255, 0.18);
+}

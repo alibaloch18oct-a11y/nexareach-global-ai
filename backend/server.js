@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -23,13 +24,13 @@ const LOGS_FILE = path.join(DATA_DIR, "logs.json");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-function ensureFile(filePath, defaultData) {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2), "utf-8");
-  }
-}
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const useSupabase = Boolean(supabaseUrl && supabaseKey);
+const supabase = useSupabase ? createClient(supabaseUrl, supabaseKey) : null;
 
-ensureFile(PROFILE_FILE, {
+const defaultProfile = {
+  id: "default",
   fullName: "Shahzaib Ali",
   title: "Information Technology Graduate | AI & Full Stack Developer",
   email: "alibaloch18oct@gmail.com",
@@ -41,10 +42,125 @@ ensureFile(PROFILE_FILE, {
   github: "",
   resumeUrl: "",
   skills: "React, Node.js, AI Apps, Dashboards, Automation, JavaScript, Express",
-  projects: "NexaAgent AI, Jarvis AI Assistant, School Management System, FBR AI Assistant, Portfolio Website",
+  projects:
+    "NexaPOS Pro, ShopVision AI, NexaAgent AI, RealityDesk AI, Portfolio Website, School Management System, FBR AI Assistant",
   bio: "I build AI-powered software, business automation tools, dashboards, and modern web applications."
-});
+};
 
+const productCatalog = [
+  {
+    name: "NexaPOS Pro",
+    categories: ["restaurant", "cafe", "fast food", "hotel", "food"],
+    pitch:
+      "Restaurant POS with billing, orders, KDS, staff, inventory, table management and reports."
+  },
+  {
+    name: "ShopVision AI",
+    categories: ["shop", "store", "retail", "mobile", "electronics", "clothing", "supermarket"],
+    pitch:
+      "AI product content, customer management, product posts, captions, SEO and shop growth tools."
+  },
+  {
+    name: "RepairVision AI",
+    categories: ["repair", "mobile repair", "electronics repair", "service center"],
+    pitch:
+      "Repair ticketing, customer updates, inventory, technician tracking and service reports."
+  },
+  {
+    name: "NexaAgent AI",
+    categories: ["business", "company", "agency", "support", "customer service"],
+    pitch:
+      "AI customer support and WhatsApp-style business agent for answering customers and capturing leads."
+  },
+  {
+    name: "AutoProposal AI",
+    categories: ["agency", "freelancer", "consulting", "software", "company"],
+    pitch:
+      "AI proposal and quotation generator for businesses and service providers."
+  },
+  {
+    name: "Portfolio/Business Website",
+    categories: ["all", "business", "shop", "clinic", "restaurant", "real estate", "school", "company"],
+    pitch:
+      "Professional business website with portfolio, services, lead forms and SEO-ready pages."
+  },
+  {
+    name: "School Management System / EduOffice AI",
+    categories: ["school", "academy", "college", "university", "education"],
+    pitch:
+      "Student records, fees, attendance, results, staff, reports and AI office assistant."
+  },
+  {
+    name: "ClinicDesk AI",
+    categories: ["clinic", "doctor", "hospital", "medical", "pharmacy"],
+    pitch:
+      "Clinic records, appointments, patient management, billing and AI support."
+  },
+  {
+    name: "SalonBoss AI",
+    categories: ["salon", "spa", "beauty", "barber"],
+    pitch:
+      "Appointments, customer records, packages, staff scheduling and marketing messages."
+  },
+  {
+    name: "RentGuard AI",
+    categories: ["real estate", "property", "estate agent", "rent", "dealer"],
+    pitch:
+      "Property leads, rent reminders, client management, listings and follow-ups."
+  },
+  {
+    name: "Shazee AI FBR / Office Assistant",
+    categories: ["office", "tax", "lawyer", "accountant", "finance", "consultant"],
+    pitch:
+      "AI office assistant for documents, reports, FBR/tax workflows and admin automation."
+  },
+  {
+    name: "RealityDesk AI",
+    categories: ["computer", "office", "education", "support", "training"],
+    pitch:
+      "Desktop AI assistant that helps users understand screen tasks and workflow guidance."
+  },
+  {
+    name: "Custom AI Business Automation",
+    categories: ["all"],
+    pitch:
+      "Custom dashboards, CRMs, automation, AI agents and business software built for specific needs."
+  }
+];
+
+const discoveryCategories = [
+  "business",
+  "software houses",
+  "IT companies",
+  "company offices",
+  "restaurants",
+  "cafes",
+  "banks",
+  "schools",
+  "clinics",
+  "hospitals",
+  "pharmacies",
+  "hotels",
+  "shops",
+  "mobile shops",
+  "electronics shops",
+  "real estate agencies",
+  "travel agencies",
+  "salons",
+  "repair shops",
+  "law offices",
+  "accounting offices",
+  "fuel stations",
+  "gyms"
+];
+
+function ensureFile(filePath, defaultData) {
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2), "utf-8");
+  }
+}
+
+ensureFile(PROFILE_FILE, defaultProfile);
 ensureFile(LEADS_FILE, []);
 ensureFile(LOGS_FILE, []);
 
@@ -56,7 +172,8 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json({ limit: "30mb" }));
+
+app.use(express.json({ limit: "40mb" }));
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 const storage = multer.diskStorage({
@@ -75,6 +192,14 @@ function readJson(file) {
 
 function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf-8");
+}
+
+function id(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
 function normalizeHeader(header) {
@@ -137,7 +262,9 @@ function parseCsv(text) {
 
   if (value || row.length) rows.push([...row, value]);
 
-  const nonEmptyRows = rows.filter((r) => r.some((cell) => String(cell || "").trim() !== ""));
+  const nonEmptyRows = rows.filter((r) =>
+    r.some((cell) => String(cell || "").trim() !== "")
+  );
   if (nonEmptyRows.length < 2) return [];
 
   const headers = nonEmptyRows[0].map(normalizeHeader);
@@ -151,10 +278,10 @@ function parseCsv(text) {
   });
 }
 
-function getCsvValue(row, keys) {
+function csvValue(row, keys) {
   for (const key of keys) {
-    const normalizedKey = normalizeHeader(key);
-    if (row[normalizedKey]) return row[normalizedKey];
+    const k = normalizeHeader(key);
+    if (row[k]) return row[k];
   }
   return "";
 }
@@ -173,10 +300,132 @@ function createWhatsAppUrl(phone, message) {
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
-function csvRowToLead(row, index) {
-  const name = getCsvValue(row, [
-    "name",
+function toDbLead(lead) {
+  return {
+    id: lead.id,
+    business_name: lead.businessName || lead.business_name || lead.name || "",
+    contact_person: lead.contactPerson || lead.contact_person || "",
+    phone: lead.phone || "",
+    whatsapp: lead.whatsapp || lead.phone || "",
+    email: lead.email || "",
+    website: lead.website || "",
+    instagram: lead.instagram || "",
+    facebook: lead.facebook || "",
+    linkedin: lead.linkedin || "",
+    country: lead.country || "",
+    city: lead.city || "",
+    category: lead.category || "Business",
+    business_size: lead.businessSize || lead.business_size || "",
+    source: lead.source || "Manual",
+    notes: lead.notes || "",
+    status: lead.status || "New",
+    lead_score: Number(lead.leadScore ?? lead.lead_score ?? 0),
+    lead_temperature: lead.leadTemperature || lead.lead_temperature || "Cold",
+    recommended_product: lead.recommendedProduct || lead.recommended_product || "",
+    ai_reason: lead.aiReason || lead.ai_reason || "",
+    ai_problem: lead.aiProblem || lead.ai_problem || "",
+    ai_outreach_angle: lead.aiOutreachAngle || lead.ai_outreach_angle || "",
+    last_message: lead.lastMessage || lead.last_message || "",
+    last_message_mode: lead.lastMessageMode || lead.last_message_mode || "",
+    last_contacted_at: lead.lastContactedAt || lead.last_contacted_at || null,
+    next_follow_up_at: lead.nextFollowUpAt || lead.next_follow_up_at || null,
+    conversation_notes: lead.conversationNotes || lead.conversation_notes || "",
+    customer_reply: lead.customerReply || lead.customer_reply || "",
+    reply_analysis: lead.replyAnalysis || lead.reply_analysis || "",
+    next_action: lead.nextAction || lead.next_action || "",
+    estimated_deal_value: Number(lead.estimatedDealValue ?? lead.estimated_deal_value ?? 0),
+    created_at: lead.createdAt || lead.created_at || nowIso(),
+    updated_at: nowIso()
+  };
+}
+
+function fromDbLead(row) {
+  return {
+    id: row.id,
+    businessName: row.business_name || "",
+    name: row.business_name || "",
+    contactPerson: row.contact_person || "",
+    phone: row.phone || "",
+    whatsapp: row.whatsapp || "",
+    email: row.email || "",
+    website: row.website || "",
+    instagram: row.instagram || "",
+    facebook: row.facebook || "",
+    linkedin: row.linkedin || "",
+    country: row.country || "",
+    city: row.city || "",
+    location: [row.city, row.country].filter(Boolean).join(", "),
+    address: row.notes || "",
+    category: row.category || "Business",
+    businessSize: row.business_size || "",
+    source: row.source || "",
+    notes: row.notes || "",
+    status: row.status || "New",
+    leadScore: row.lead_score || 0,
+    leadTemperature: row.lead_temperature || "Cold",
+    recommendedProduct: row.recommended_product || "",
+    aiReason: row.ai_reason || "",
+    aiProblem: row.ai_problem || "",
+    aiOutreachAngle: row.ai_outreach_angle || "",
+    lastMessage: row.last_message || "",
+    lastMessageMode: row.last_message_mode || "",
+    lastContactedAt: row.last_contacted_at || "",
+    nextFollowUpAt: row.next_follow_up_at || "",
+    conversationNotes: row.conversation_notes || "",
+    customerReply: row.customer_reply || "",
+    replyAnalysis: row.reply_analysis || "",
+    nextAction: row.next_action || "",
+    estimatedDealValue: Number(row.estimated_deal_value || 0),
+    createdAt: row.created_at || "",
+    updatedAt: row.updated_at || ""
+  };
+}
+
+function toDbProfile(profile) {
+  return {
+    id: "default",
+    full_name: profile.fullName || profile.full_name || "",
+    title: profile.title || "",
+    email: profile.email || "",
+    phone: profile.phone || "",
+    whatsapp: profile.whatsapp || "",
+    location: profile.location || "",
+    portfolio: profile.portfolio || "",
+    linkedin: profile.linkedin || "",
+    github: profile.github || "",
+    resume_url: profile.resumeUrl || profile.resume_url || "",
+    skills: profile.skills || "",
+    projects: profile.projects || "",
+    bio: profile.bio || "",
+    updated_at: nowIso()
+  };
+}
+
+function fromDbProfile(row) {
+  if (!row) return defaultProfile;
+  return {
+    id: "default",
+    fullName: row.full_name || "",
+    title: row.title || "",
+    email: row.email || "",
+    phone: row.phone || "",
+    whatsapp: row.whatsapp || "",
+    location: row.location || "",
+    portfolio: row.portfolio || "",
+    linkedin: row.linkedin || "",
+    github: row.github || "",
+    resumeUrl: row.resume_url || "",
+    skills: row.skills || "",
+    projects: row.projects || "",
+    bio: row.bio || ""
+  };
+}
+
+function csvRowToLead(row) {
+  const businessName = csvValue(row, [
     "business name",
+    "business_name",
+    "name",
     "company",
     "company name",
     "title",
@@ -184,53 +433,360 @@ function csvRowToLead(row, index) {
     "place name"
   ]);
 
-  const phone = getCsvValue(row, [
-    "phone",
-    "whatsapp",
-    "mobile",
-    "contact",
-    "contact phone",
-    "contact:phone",
-    "telephone"
-  ]);
-
-  const country = getCsvValue(row, ["country"]);
-  const city = getCsvValue(row, ["city"]);
-  const location = getCsvValue(row, ["location"]) || [city, country].filter(Boolean).join(", ");
+  const contactPerson = csvValue(row, ["owner", "contact person", "contact_person", "person"]);
+  const phone = csvValue(row, ["phone", "mobile", "telephone", "contact phone"]);
+  const whatsapp = csvValue(row, ["whatsapp", "whatsapp number", "whatsapp_number"]) || phone;
+  const country = csvValue(row, ["country"]);
+  const city = csvValue(row, ["city"]);
+  const category = csvValue(row, ["category", "business category", "type", "business type"]);
 
   return {
-    id: getCsvValue(row, ["id"]) || `csv-${Date.now()}-${index}`,
-    osmId: getCsvValue(row, ["osmid", "osm id", "osm"]),
-    name,
-    category: getCsvValue(row, ["category", "type", "business type"]) || "Business",
+    id: csvValue(row, ["id"]) || id("lead"),
+    businessName,
+    contactPerson,
     phone,
-    email: getCsvValue(row, ["email", "mail", "contact email"]),
-    website: getCsvValue(row, ["website", "url", "web"]),
-    country: country || "",
-    city: city || "",
-    location: location || "Global",
-    address: getCsvValue(row, ["address", "addr", "street"]) || location || "Global",
-    contactPerson: getCsvValue(row, ["contact person", "contactperson"]) || "",
-    notes: getCsvValue(row, ["notes", "note"]) || "Imported from CSV.",
-    status: phone ? "Ready to WhatsApp" : "Needs Phone",
-    priority: getCsvValue(row, ["priority"]) || "Medium",
-    source: getCsvValue(row, ["source"]) || "CSV Import",
-    lat: getCsvValue(row, ["lat", "latitude"]),
-    lon: getCsvValue(row, ["lon", "lng", "longitude"]),
+    whatsapp,
+    email: csvValue(row, ["email", "mail"]),
+    website: csvValue(row, ["website", "url", "web"]),
+    instagram: csvValue(row, ["instagram"]),
+    facebook: csvValue(row, ["facebook"]),
+    linkedin: csvValue(row, ["linkedin"]),
+    country,
+    city,
+    category: category || "Business",
+    businessSize: csvValue(row, ["business size", "size"]),
+    source: csvValue(row, ["source"]) || "CSV Import",
+    notes: csvValue(row, ["notes", "note", "address"]) || "",
+    status: csvValue(row, ["status"]) || "New",
+    leadScore: Number(csvValue(row, ["lead score", "score"]) || 0),
+    recommendedProduct: csvValue(row, ["recommended product", "product"]),
+    estimatedDealValue: Number(csvValue(row, ["estimated deal value", "deal value"]) || 0),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
     lastMessage: "",
-    whatsappUrl: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    conversationNotes: "",
+    nextFollowUpAt: ""
   };
 }
 
-function filterLeads(leads, query) {
+function matchProduct(lead) {
+  const text = `${lead.businessName || ""} ${lead.category || ""} ${lead.notes || ""}`.toLowerCase();
+
+  const best = productCatalog.find((product) =>
+    product.categories.some((cat) => cat !== "all" && text.includes(cat))
+  );
+
+  return best || productCatalog.find((product) => product.name === "Custom AI Business Automation");
+}
+
+function scoreLead(lead) {
+  const text = `${lead.businessName || ""} ${lead.category || ""} ${lead.website || ""} ${lead.phone || ""} ${lead.email || ""} ${lead.notes || ""}`.toLowerCase();
+  const product = matchProduct(lead);
+
+  let score = 35;
+
+  if (lead.phone || lead.whatsapp) score += 15;
+  if (lead.email) score += 10;
+  if (lead.website) score += 10;
+  if (lead.country && lead.city) score += 5;
+  if (lead.category) score += 10;
+
+  const hotWords = [
+    "restaurant",
+    "clinic",
+    "school",
+    "shop",
+    "mobile",
+    "real estate",
+    "salon",
+    "software",
+    "company",
+    "repair",
+    "hotel",
+    "cafe",
+    "pharmacy"
+  ];
+
+  if (hotWords.some((word) => text.includes(word))) score += 10;
+
+  score = Math.max(0, Math.min(100, score));
+  const temperature = score >= 75 ? "Hot" : score >= 55 ? "Warm" : "Cold";
+
+  const problemMap = {
+    "NexaPOS Pro":
+      "They may need better billing, order tracking, inventory, staff reports and daily sales control.",
+    "ShopVision AI":
+      "They may need better product promotion, content, customer replies and online visibility.",
+    "RepairVision AI":
+      "They may need repair ticket tracking, customer updates and technician workflow control.",
+    "School Management System / EduOffice AI":
+      "They may need student records, attendance, fees, reports and admin automation.",
+    "ClinicDesk AI":
+      "They may need appointment management, patient records and billing workflow.",
+    "SalonBoss AI":
+      "They may need appointment scheduling, customer records and staff/package management.",
+    "RentGuard AI":
+      "They may need property lead tracking, follow-ups and client management.",
+    "Custom AI Business Automation":
+      "They may need custom automation, CRM, dashboard or AI support system."
+  };
+
+  return {
+    leadScore: score,
+    leadTemperature: temperature,
+    recommendedProduct: product.name,
+    aiReason: `${lead.businessName || "This business"} matches ${product.name} because its category and business type can benefit from ${product.pitch}`,
+    aiProblem: problemMap[product.name] || "They may need smoother business operations and automation.",
+    aiOutreachAngle: `Offer a quick demo of ${product.name} and explain how it can save time, organize work and improve customer handling.`
+  };
+}
+
+function buildMessage({ profile, lead, mode = "short_whatsapp" }) {
+  const product = lead.recommendedProduct || matchProduct(lead).name;
+  const portfolio = profile.portfolio || "[Portfolio Link]";
+  const linkedin = profile.linkedin || "[LinkedIn Link]";
+  const baseIntro = `Hi, I came across ${lead.businessName || "your business"} and wanted to share something that could help you manage customers, sales, operations and follow-ups more smoothly.`;
+  const productLine = `I build AI-powered business software, and for your type of business I think ${product} could be useful.`;
+  const proofLine = `You can see my work here: ${portfolio}`;
+
+  if (mode === "email_pitch") {
+    return `Subject: Software solution for ${lead.businessName || "your business"}
+
+Hello ${lead.contactPerson || "Team"},
+
+${baseIntro}
+
+${productLine}
+
+I can help with custom software such as POS systems, AI chatbots, lead management tools, websites, dashboards and automation systems.
+
+${proofLine}
+LinkedIn: ${linkedin}
+
+If you are open to it, I can share a quick demo or explain how this can help your business.
+
+Best regards,
+${profile.fullName || "Shahzaib Ali"}`;
+  }
+
+  if (mode === "international_formal") {
+    return `Hello ${lead.contactPerson || "Team"}, I came across ${lead.businessName || "your business"} and wanted to introduce myself. I build professional AI-powered business software including POS systems, CRM tools, websites, dashboards and automation systems.
+
+For your business, ${product} may help improve operations, customer handling and daily management.
+
+Portfolio: ${portfolio}
+LinkedIn: ${linkedin}
+
+If you are open to it, I can share a short demo.`;
+  }
+
+  if (mode === "pakistani_friendly") {
+    return `Assalamualaikum, I came across ${lead.businessName || "your business"}. I build websites, POS systems, AI chatbots, dashboards and business automation software.
+
+Aap ke business ke liye ${product} useful ho sakta hai because it can help manage customers, sales, orders and follow-ups.
+
+Portfolio: ${portfolio}
+
+Agar aap interested hon to main quick demo share kar sakta hoon.`;
+  }
+
+  if (mode === "follow_up") {
+    return `Hi, just following up on my previous message. I wanted to check if you would be open to seeing a quick demo of ${product}. It may help ${lead.businessName || "your business"} manage customers, sales and operations more smoothly.`;
+  }
+
+  if (mode === "final_reminder") {
+    return `Hi, this is my final follow-up. I build AI-powered business software and thought ${product} could be useful for ${lead.businessName || "your business"}. If now is not the right time, no problem at all. Wishing you success.`;
+  }
+
+  if (mode === "call_script") {
+    return `Call Script:
+Hello, am I speaking with ${lead.contactPerson || "the owner/manager"} of ${lead.businessName || "the business"}?
+
+My name is ${profile.fullName || "Shahzaib Ali"}. I build business software and AI automation tools. I wanted to ask if you currently use any system to manage customers, sales, orders, staff or follow-ups.
+
+For your business, I believe ${product} could help. Would you be open to a quick demo?`;
+  }
+
+  return `${baseIntro}
+
+${productLine}
+
+I build custom AI-powered business software such as POS systems, customer support agents, lead management tools, websites and automation dashboards.
+
+${proofLine}
+
+If you are open to it, I can share a quick demo.`;
+}
+
+function analyzeReplyText(reply) {
+  const text = String(reply || "").toLowerCase();
+
+  let interestLevel = "Cold";
+  let updatedStatus = "Follow Up";
+  let nextAction = "Send a polite follow-up later.";
+  let bestReply =
+    "Thank you for your reply. I can share a quick demo and explain how it can help your business.";
+
+  if (text.includes("price") || text.includes("cost") || text.includes("charges")) {
+    interestLevel = "Warm";
+    updatedStatus = "Interested";
+    nextAction = "Send price range and demo offer.";
+    bestReply =
+      "Thanks for asking. The price depends on features, but I can first show you a quick demo and then suggest a suitable package for your business.";
+  }
+
+  if (text.includes("demo") || text.includes("show") || text.includes("interested")) {
+    interestLevel = "Hot";
+    updatedStatus = "Demo Booked";
+    nextAction = "Send demo link or schedule a call.";
+    bestReply =
+      "Great. I can share a quick demo. Please tell me what time is suitable for you, or I can send a short overview first.";
+  }
+
+  if (text.includes("not interested") || text.includes("no need") || text.includes("don't need")) {
+    interestLevel = "Cold";
+    updatedStatus = "Not Interested";
+    nextAction = "Do not follow up soon.";
+    bestReply =
+      "No problem. Thank you for your time. If you need any software or automation in the future, feel free to contact me.";
+  }
+
+  if (text.includes("later") || text.includes("busy") || text.includes("after")) {
+    interestLevel = "Warm";
+    updatedStatus = "Follow Up";
+    nextAction = "Follow up after 3 days.";
+    bestReply = "No problem. I will follow up later. Thank you for your time.";
+  }
+
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + (updatedStatus === "Demo Booked" ? 1 : 3));
+
+  return {
+    interestLevel,
+    updatedStatus,
+    nextAction,
+    bestReply,
+    nextFollowUpAt: nextDate.toISOString(),
+    analysis: `Customer reply indicates ${interestLevel} interest. Suggested status: ${updatedStatus}. Next action: ${nextAction}`
+  };
+}
+
+async function getProfile() {
+  if (useSupabase) {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", "default").single();
+    if (error && error.code !== "PGRST116") throw error;
+    if (!data) {
+      await supabase.from("profiles").upsert(toDbProfile(defaultProfile));
+      return defaultProfile;
+    }
+    return fromDbProfile(data);
+  }
+
+  return readJson(PROFILE_FILE);
+}
+
+async function saveProfile(profile) {
+  if (useSupabase) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(toDbProfile(profile))
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    return fromDbProfile(data);
+  }
+
+  const updated = { ...readJson(PROFILE_FILE), ...profile };
+  writeJson(PROFILE_FILE, updated);
+  return updated;
+}
+
+function countLocal(leads) {
+  return {
+    total: leads.length,
+    readyToWhatsApp: leads.filter((lead) => lead.phone || lead.whatsapp).length,
+    needsPhone: leads.filter((lead) => !lead.phone && !lead.whatsapp).length,
+    hot: leads.filter((lead) => lead.leadTemperature === "Hot" || Number(lead.leadScore || 0) >= 75).length,
+    interested: leads.filter((lead) => lead.status === "Interested").length,
+    demoBooked: leads.filter((lead) => lead.status === "Demo Booked").length,
+    closedWon: leads.filter((lead) => lead.status === "Closed Won").length,
+    estimatedRevenue: leads.reduce((sum, lead) => sum + Number(lead.estimatedDealValue || 0), 0)
+  };
+}
+
+async function dashboardCounts(filter = {}) {
+  if (!useSupabase) return countLocal(readJson(LEADS_FILE));
+
+  let db = supabase.from("leads").select("*");
+
+  if (filter.country && filter.country !== "All Countries") db = db.eq("country", filter.country);
+  if (filter.city && filter.city !== "All Cities") db = db.eq("city", filter.city);
+
+  const { data, error } = await db;
+  if (error) throw error;
+
+  return countLocal((data || []).map(fromDbLead));
+}
+
+async function listLeads(query) {
+  const page = Math.max(parseInt(query.page || "1", 10), 1);
+  const limit = Math.min(Math.max(parseInt(query.limit || "50", 10), 10), 100);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
   const country = query.country || "All Countries";
   const city = query.city || "All Cities";
   const status = query.status || "All";
-  const q = String(query.q || "").toLowerCase().trim();
+  const q = String(query.q || "").trim();
 
-  return leads.filter((lead) => {
+  if (useSupabase) {
+    let db = supabase
+      .from("leads")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false });
+
+    if (country && country !== "All Countries") db = db.eq("country", country);
+    if (city && city !== "All Cities") db = db.eq("city", city);
+
+    if (status && status !== "All") {
+      if (status === "Ready to WhatsApp") {
+        db = db.not("whatsapp", "eq", "");
+      } else if (status === "Needs Phone") {
+        db = db.or("phone.is.null,phone.eq.,whatsapp.is.null,whatsapp.eq.");
+      } else {
+        db = db.eq("status", status);
+      }
+    }
+
+    if (q) {
+      db = db.or(
+        `business_name.ilike.%${q}%,category.ilike.%${q}%,country.ilike.%${q}%,city.ilike.%${q}%,email.ilike.%${q}%`
+      );
+    }
+
+    const { data, error, count } = await db.range(from, to);
+    if (error) throw error;
+
+    const items = (data || []).map(fromDbLead);
+    const total = count || 0;
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
+      counts: await dashboardCounts({ country, city })
+    };
+  }
+
+  const all = readJson(LEADS_FILE).map((lead) => ({
+    ...lead,
+    businessName: lead.businessName || lead.name || lead.business_name || ""
+  }));
+
+  const filtered = all.filter((lead) => {
     const matchesCountry = country === "All Countries" || !country ? true : lead.country === country;
     const matchesCity = city === "All Cities" || !city ? true : lead.city === city;
 
@@ -238,29 +794,106 @@ function filterLeads(leads, query) {
       status === "All"
         ? true
         : status === "Ready to WhatsApp"
-        ? Boolean(lead.phone)
+        ? Boolean(lead.phone || lead.whatsapp)
         : status === "Needs Phone"
-        ? !lead.phone
+        ? !lead.phone && !lead.whatsapp
         : lead.status === status;
 
-    const haystack = `${lead.name} ${lead.category} ${lead.phone} ${lead.email} ${lead.status} ${lead.address} ${lead.source} ${lead.city} ${lead.country}`.toLowerCase();
-
-    const matchesSearch = q ? haystack.includes(q) : true;
+    const haystack = `${lead.businessName} ${lead.category} ${lead.country} ${lead.city} ${lead.email} ${lead.phone}`.toLowerCase();
+    const matchesSearch = q ? haystack.includes(q.toLowerCase()) : true;
 
     return matchesCountry && matchesCity && matchesStatus && matchesSearch;
   });
+
+  const items = filtered.slice(from, from + limit);
+
+  return {
+    items,
+    total: filtered.length,
+    page,
+    limit,
+    totalPages: Math.max(Math.ceil(filtered.length / limit), 1),
+    counts: countLocal(filtered)
+  };
 }
 
-function getFilteredCounts(leads) {
-  return {
-    total: leads.length,
-    readyToWhatsApp: leads.filter((lead) => lead.phone).length,
-    needsPhone: leads.filter((lead) => !lead.phone).length,
-    generated: leads.filter((lead) => String(lead.status || "").includes("Generated")).length,
-    sent: leads.filter((lead) => lead.status === "Sent").length,
-    interested: leads.filter((lead) => lead.status === "Interested").length,
-    followUp: leads.filter((lead) => lead.status === "Follow Up").length
+async function getLead(leadId) {
+  if (useSupabase) {
+    const { data, error } = await supabase.from("leads").select("*").eq("id", leadId).single();
+    if (error) throw error;
+    return fromDbLead(data);
+  }
+
+  const lead = readJson(LEADS_FILE).find((item) => item.id === leadId);
+  if (!lead) throw new Error("Lead not found");
+  return lead;
+}
+
+async function saveLead(lead) {
+  const prepared = {
+    id: lead.id || id("lead"),
+    ...lead,
+    updatedAt: nowIso()
   };
+
+  if (useSupabase) {
+    const { data, error } = await supabase
+      .from("leads")
+      .upsert(toDbLead(prepared))
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    return fromDbLead(data);
+  }
+
+  const leads = readJson(LEADS_FILE);
+  const index = leads.findIndex((item) => item.id === prepared.id);
+
+  if (index >= 0) leads[index] = { ...leads[index], ...prepared };
+  else leads.unshift(prepared);
+
+  writeJson(LEADS_FILE, leads);
+  return prepared;
+}
+
+async function deleteLeadById(leadId) {
+  if (useSupabase) {
+    const { error } = await supabase.from("leads").delete().eq("id", leadId);
+    if (error) throw error;
+    return;
+  }
+
+  writeJson(LEADS_FILE, readJson(LEADS_FILE).filter((lead) => lead.id !== leadId));
+}
+
+async function logActivity({ leadId, leadName, action, channel = "", details = "" }) {
+  const log = {
+    id: id("log"),
+    lead_id: leadId,
+    lead_name: leadName,
+    action,
+    channel,
+    details,
+    created_at: nowIso()
+  };
+
+  if (useSupabase) {
+    await supabase.from("activity_logs").insert(log);
+    return;
+  }
+
+  const logs = readJson(LOGS_FILE);
+  logs.unshift({
+    id: log.id,
+    leadId,
+    leadName,
+    action,
+    channel,
+    details,
+    createdAt: log.created_at
+  });
+  writeJson(LOGS_FILE, logs.slice(0, 500));
 }
 
 function getTag(tags, keys) {
@@ -270,15 +903,53 @@ function getTag(tags, keys) {
   return "";
 }
 
+function discoverySelector(category) {
+  const c = String(category || "business").toLowerCase();
+
+  if (c.includes("software") || c.includes("it")) return [`node["office"~"it|company"]`, `way["office"~"it|company"]`];
+  if (c.includes("company") || c.includes("office")) return [`node["office"]`, `way["office"]`];
+  if (c.includes("restaurant")) return [`node["amenity"~"restaurant|fast_food"]`, `way["amenity"~"restaurant|fast_food"]`];
+  if (c.includes("cafe")) return [`node["amenity"="cafe"]`, `way["amenity"="cafe"]`];
+  if (c.includes("bank")) return [`node["amenity"~"bank|atm"]`, `way["amenity"~"bank|atm"]`];
+  if (c.includes("school")) return [`node["amenity"~"school|college|university"]`, `way["amenity"~"school|college|university"]`];
+  if (c.includes("clinic")) return [`node["amenity"~"clinic|doctors"]`, `way["amenity"~"clinic|doctors"]`];
+  if (c.includes("hospital")) return [`node["amenity"="hospital"]`, `way["amenity"="hospital"]`];
+  if (c.includes("pharmacy")) return [`node["amenity"="pharmacy"]`, `way["amenity"="pharmacy"]`];
+  if (c.includes("hotel")) return [`node["tourism"~"hotel|guest_house|hostel|motel"]`, `way["tourism"~"hotel|guest_house|hostel|motel"]`];
+  if (c.includes("mobile")) return [`node["shop"~"mobile_phone|electronics"]`, `way["shop"~"mobile_phone|electronics"]`];
+  if (c.includes("electronic")) return [`node["shop"="electronics"]`, `way["shop"="electronics"]`];
+  if (c.includes("real")) return [`node["office"="estate_agent"]`, `way["office"="estate_agent"]`];
+  if (c.includes("travel")) return [`node["office"="travel_agent"]`, `way["office"="travel_agent"]`];
+  if (c.includes("salon")) return [`node["shop"~"hairdresser|beauty"]`, `way["shop"~"hairdresser|beauty"]`];
+  if (c.includes("repair")) return [`node["shop"~"mobile_phone|electronics|computer"]`, `way["shop"~"mobile_phone|electronics|computer"]`];
+  if (c.includes("law")) return [`node["office"="lawyer"]`, `way["office"="lawyer"]`];
+  if (c.includes("account")) return [`node["office"="accountant"]`, `way["office"="accountant"]`];
+  if (c.includes("fuel")) return [`node["amenity"="fuel"]`, `way["amenity"="fuel"]`];
+  if (c.includes("gym")) return [`node["leisure"="fitness_centre"]`, `way["leisure"="fitness_centre"]`];
+  if (c.includes("shop")) return [`node["shop"]`, `way["shop"]`];
+
+  return [
+    `node["amenity"~"restaurant|cafe|fast_food|bank|school|college|university|clinic|hospital|doctors|pharmacy|fuel"]`,
+    `way["amenity"~"restaurant|cafe|fast_food|bank|school|college|university|clinic|hospital|doctors|pharmacy|fuel"]`,
+    `node["shop"]`,
+    `way["shop"]`,
+    `node["office"]`,
+    `way["office"]`,
+    `node["tourism"~"hotel|guest_house|hostel|motel"]`,
+    `way["tourism"~"hotel|guest_house|hostel|motel"]`
+  ];
+}
+
 function mapOsmCategory(tags = {}) {
   if (tags.shop) return `Shop - ${tags.shop}`;
   if (tags.office) return `Office - ${tags.office}`;
   if (tags.amenity) return `Amenity - ${tags.amenity}`;
   if (tags.tourism) return `Tourism - ${tags.tourism}`;
+  if (tags.leisure) return `Leisure - ${tags.leisure}`;
   return "Business";
 }
 
-function buildAddress(tags = {}, fallback = "Global") {
+function buildAddress(tags = {}, fallback = "") {
   const parts = [
     tags["addr:housenumber"],
     tags["addr:street"],
@@ -292,109 +963,12 @@ function buildAddress(tags = {}, fallback = "Global") {
   return parts.length ? parts.join(", ") : fallback;
 }
 
-function osmElementToLead(element, meta) {
-  const tags = element.tags || {};
-  const name = tags.name || tags["name:en"] || tags.brand || tags.operator || "";
-  if (!name) return null;
-
-  const phone = getTag(tags, [
-    "phone",
-    "contact:phone",
-    "mobile",
-    "contact:mobile",
-    "whatsapp",
-    "contact:whatsapp"
-  ]);
-
-  const email = getTag(tags, ["email", "contact:email"]);
-  const website = getTag(tags, ["website", "contact:website", "url"]);
-  const category = mapOsmCategory(tags);
-  const address = buildAddress(tags, `${meta.city}, ${meta.country}`);
-  const lat = element.lat || element.center?.lat || "";
-  const lon = element.lon || element.center?.lon || "";
-
-  return {
-    id: `osm-${element.type}-${element.id}`,
-    osmId: `${element.type}/${element.id}`,
-    name,
-    category,
-    phone,
-    email,
-    website,
-    country: meta.country,
-    city: meta.city,
-    location: `${meta.city}, ${meta.country}`,
-    address,
-    contactPerson: "",
-    notes: `Real public OpenStreetMap lead. OSM ID: ${element.type}/${element.id}.`,
-    status: phone ? "Ready to WhatsApp" : "Needs Phone",
-    priority: category.includes("IT") || category.includes("Company") || category.includes("School") ? "High" : "Medium",
-    source: "OpenStreetMap / Overpass",
-    lat,
-    lon,
-    lastMessage: "",
-    whatsappUrl: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function dedupeLeads(existing, incoming) {
-  const seen = new Set(
-    existing.map((lead) => {
-      if (lead.osmId) return `osm:${lead.osmId}`;
-      return `${lead.name}-${lead.address}-${lead.city}-${lead.country}`.toLowerCase().trim();
-    })
-  );
-
-  const unique = [];
-
-  for (const lead of incoming) {
-    const key = lead.osmId
-      ? `osm:${lead.osmId}`
-      : `${lead.name}-${lead.address}-${lead.city}-${lead.country}`.toLowerCase().trim();
-
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(lead);
-    }
-  }
-
-  return unique;
-}
-
-function categoryToOverpass(category) {
-  const c = String(category || "business").toLowerCase();
-
-  if (c.includes("restaurant")) return `node["amenity"~"restaurant|fast_food|cafe"]`;
-  if (c.includes("cafe")) return `node["amenity"~"cafe|restaurant|fast_food"]`;
-  if (c.includes("bank")) return `node["amenity"~"bank|atm"]`;
-  if (c.includes("school")) return `node["amenity"~"school|college|university"]`;
-  if (c.includes("clinic")) return `node["amenity"~"clinic|hospital|doctors|pharmacy"]`;
-  if (c.includes("hotel")) return `node["tourism"~"hotel|guest_house|hostel|motel"]`;
-  if (c.includes("real")) return `node["office"="estate_agent"]`;
-  if (c.includes("travel")) return `node["office"="travel_agent"]`;
-  if (c.includes("software") || c.includes("it")) return `node["office"~"it|company"]`;
-  if (c.includes("office") || c.includes("company")) return `node["office"]`;
-  if (c.includes("shop") || c.includes("store")) return `node["shop"]`;
-
-  return `
-node["amenity"~"restaurant|cafe|fast_food|bank|atm|school|college|university|clinic|hospital|doctors|pharmacy|fuel|marketplace"]
-node["shop"]
-node["office"]
-node["tourism"~"hotel|guest_house|hostel|motel"]
-`;
-}
-
-async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 90000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeout);
     return response;
   } catch (error) {
@@ -403,26 +977,26 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 90000) {
   }
 }
 
-async function geocodeLocation(city, country) {
+async function geocodeCity(city, country) {
   const query = encodeURIComponent(`${city}, ${country}`);
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`;
 
-  const response = await fetchJsonWithTimeout(
+  const response = await fetchWithTimeout(
     url,
     {
       headers: {
-        "User-Agent": "NexaReachGlobalAI/2.0 local outreach CRM"
+        "User-Agent": "NexaReachAIPro/2.0 safe public lead discovery"
       }
     },
     45000
   );
 
-  if (!response.ok) throw new Error(`Geocoding failed: ${response.status}`);
+  if (!response.ok) throw new Error(`Location lookup failed: ${response.status}`);
 
   const data = await response.json();
 
   if (!data.length || !data[0].boundingbox) {
-    throw new Error("City/country not found. Try another spelling.");
+    throw new Error("City/country not found. Try a clearer city and country name.");
   }
 
   const [south, north, west, east] = data[0].boundingbox.map(Number);
@@ -436,29 +1010,24 @@ async function geocodeLocation(city, country) {
   };
 }
 
-function buildOverpassQueryFromBBox(bbox, category) {
-  const selector = categoryToOverpass(category);
+function buildOverpassQuery({ bbox, category, limit = 100 }) {
   const box = `(${bbox.south},${bbox.west},${bbox.north},${bbox.east})`;
+  const selectors = discoverySelector(category);
 
-  const selectorLines = selector
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => `${line}${box};`)
-    .join("\n  ");
+  const lines = selectors.map((selector) => `${selector}${box};`).join("\n  ");
 
   return `
 [out:json][timeout:90];
 (
-  ${selectorLines}
+  ${lines}
 );
-out center tags;
+out center tags ${limit};
 `;
 }
 
-async function fetchGlobalBusinesses({ city, country, category }) {
-  const bbox = await geocodeLocation(city, country);
-  const query = buildOverpassQueryFromBBox(bbox, category);
+async function fetchOsmLeads({ country, city, category, limit = 100 }) {
+  const bbox = await geocodeCity(city, country);
+  const query = buildOverpassQuery({ bbox, category, limit });
 
   const endpoints = [
     "https://overpass.kumi.systems/api/interpreter",
@@ -469,13 +1038,13 @@ async function fetchGlobalBusinesses({ city, country, category }) {
 
   for (const endpoint of endpoints) {
     try {
-      const response = await fetchJsonWithTimeout(
+      const response = await fetchWithTimeout(
         endpoint,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "User-Agent": "NexaReachGlobalAI/2.0"
+            "User-Agent": "NexaReachAIPro/2.0"
           },
           body: new URLSearchParams({ data: query })
         },
@@ -492,198 +1061,385 @@ async function fetchGlobalBusinesses({ city, country, category }) {
       };
     } catch (error) {
       lastError = error;
-      console.log(`Overpass failed: ${endpoint}`, error.message);
+      console.log(`Overpass endpoint failed: ${endpoint}`, error.message);
     }
   }
 
-  throw lastError || new Error("All Overpass endpoints failed.");
+  throw lastError || new Error("All public discovery endpoints failed.");
 }
 
-function buildFallbackMessage(profile, lead, goal = "business") {
-  const name = profile.fullName || "Shahzaib Ali";
-  const portfolio = profile.portfolio || "[Portfolio Link]";
-  const linkedin = profile.linkedin || "[LinkedIn Link]";
-  const resume = profile.resumeUrl || "[Resume Link]";
-  const skills = profile.skills || "AI apps, websites, dashboards, automation";
+function osmElementToLead(element, meta) {
+  const tags = element.tags || {};
+  const businessName = tags.name || tags["name:en"] || tags.brand || tags.operator || "";
 
-  if (goal === "job") {
-    return `Dear ${lead.contactPerson || "Hiring Team"},
+  if (!businessName) return null;
 
-My name is ${name}. I am an Information Technology graduate and I build AI-powered software, dashboards, web applications, and business automation tools.
+  const phone = getTag(tags, ["phone", "contact:phone", "mobile", "contact:mobile"]);
+  const whatsapp = getTag(tags, ["whatsapp", "contact:whatsapp"]) || phone;
+  const email = getTag(tags, ["email", "contact:email"]);
+  const website = getTag(tags, ["website", "contact:website", "url"]);
+  const facebook = getTag(tags, ["contact:facebook", "facebook"]);
+  const instagram = getTag(tags, ["contact:instagram", "instagram"]);
+  const linkedin = getTag(tags, ["contact:linkedin", "linkedin"]);
 
-I am looking for a suitable opportunity in software development, AI automation, frontend development, full-stack development, IT support, internship, freelance work, or project collaboration.
+  const lat = element.lat || element.center?.lat || "";
+  const lon = element.lon || element.center?.lon || "";
+  const osmId = `${element.type}/${element.id}`;
+  const category = mapOsmCategory(tags);
+  const notes = buildAddress(tags, `${meta.city}, ${meta.country}`);
 
-Skills: ${skills}
+  const lead = {
+    id: `osm-${element.type}-${element.id}`,
+    businessName,
+    contactPerson: "",
+    phone,
+    whatsapp,
+    email,
+    website,
+    instagram,
+    facebook,
+    linkedin,
+    country: meta.country,
+    city: meta.city,
+    category,
+    businessSize: "",
+    source: "OpenStreetMap / Overpass",
+    notes,
+    status: "New",
+    estimatedDealValue: 0,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    osmId,
+    lat,
+    lon
+  };
 
-Portfolio: ${portfolio}
-LinkedIn: ${linkedin}
-Resume: ${resume}
-
-Please contact me if there is any suitable opportunity.
-
-Best regards,
-${name}`;
-  }
-
-  return `Hello ${lead.contactPerson || "Team"},
-
-My name is ${name}. I build AI-powered software, websites, dashboards, WhatsApp-style business agents, and automation tools.
-
-I found ${lead.name} in ${lead.location || "your area"} and wanted to share my work in case your business needs a website, AI chatbot, customer support system, lead capture system, or business dashboard.
-
-Skills: ${skills}
-
-Portfolio: ${portfolio}
-LinkedIn: ${linkedin}
-Resume: ${resume}
-
-Please contact me if you need any software or AI automation service.
-
-Best regards,
-${name}`;
+  return {
+    ...lead,
+    ...scoreLead(lead),
+    enrichmentLinks: buildEnrichmentLinks(lead)
+  };
 }
 
-async function generateGroqMessage(profile, lead, goal) {
-  const apiKey = process.env.GROQ_API_KEY;
+function buildEnrichmentLinks(lead) {
+  const q = encodeURIComponent(
+    `${lead.businessName || ""} ${lead.city || ""} ${lead.country || ""}`.trim()
+  );
 
-  if (!apiKey || apiKey === "your_groq_api_key_here") {
-    return buildFallbackMessage(profile, lead, goal);
-  }
-
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are NexaReach Global AI. Write short, respectful, personalized outreach messages. Do not sound spammy. Do not make fake claims. Use simple professional English. Always include portfolio, LinkedIn and resume if available. Make it suitable for WhatsApp."
-          },
-          {
-            role: "user",
-            content: `
-Profile:
-Name: ${profile.fullName}
-Title: ${profile.title}
-Email: ${profile.email}
-Portfolio: ${profile.portfolio}
-LinkedIn: ${profile.linkedin}
-Resume: ${profile.resumeUrl}
-Skills: ${profile.skills}
-Projects: ${profile.projects}
-
-Lead:
-Name: ${lead.name}
-Category: ${lead.category}
-Location: ${lead.location}
-Website: ${lead.website}
-Notes: ${lead.notes}
-
-Goal: ${goal}
-Create one message.
-`
-          }
-        ],
-        temperature: 0.55,
-        max_tokens: 650
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) return buildFallbackMessage(profile, lead, goal);
-
-    return data.choices?.[0]?.message?.content || buildFallbackMessage(profile, lead, goal);
-  } catch {
-    return buildFallbackMessage(profile, lead, goal);
-  }
+  return {
+    google: `https://www.google.com/search?q=${q}`,
+    maps: `https://www.google.com/maps/search/${q}`,
+    facebook: `https://www.facebook.com/search/pages/?q=${q}`,
+    linkedin: `https://www.linkedin.com/search/results/companies/?keywords=${q}`,
+    instagram: `https://www.instagram.com/explore/search/keyword/?q=${q}`
+  };
 }
+
+async function leadExists(lead) {
+  const name = String(lead.businessName || "").toLowerCase().trim();
+
+  if (!name) return true;
+
+  if (useSupabase) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id")
+      .ilike("business_name", lead.businessName)
+      .eq("country", lead.country || "")
+      .eq("city", lead.city || "")
+      .limit(1);
+
+    if (error) throw error;
+    return Boolean(data && data.length);
+  }
+
+  const existing = readJson(LEADS_FILE);
+
+  return existing.some((item) => {
+    const itemName = String(item.businessName || item.name || "").toLowerCase().trim();
+    return itemName === name && item.country === lead.country && item.city === lead.city;
+  });
+}
+
+app.get("/", (req, res) => {
+  res.json({
+    app: "NexaReach AI Pro — Global AutoClient Hunter",
+    status: "running",
+    phase: "2-safe-public-discovery",
+    database: useSupabase ? "supabase" : "local-json"
+  });
+});
 
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    app: "NexaReach Global AI",
-    time: new Date().toISOString()
+    app: "NexaReach AI Pro",
+    phase: "2",
+    database: useSupabase ? "supabase" : "local-json",
+    time: nowIso()
   });
 });
 
-app.get("/", (req, res) => {
-  res.json({
-    app: "NexaReach Global AI",
-    status: "running",
-    mode: "paginated-fast"
-  });
+app.get("/api/products", (req, res) => {
+  res.json(productCatalog);
 });
 
-app.get("/api/profile", (req, res) => {
-  res.json(readJson(PROFILE_FILE));
+app.get("/api/discovery/categories", (req, res) => {
+  res.json(discoveryCategories);
 });
 
-app.put("/api/profile", (req, res) => {
-  const current = readJson(PROFILE_FILE);
-  const updated = { ...current, ...req.body };
-  writeJson(PROFILE_FILE, updated);
-  res.json(updated);
+app.post("/api/discovery/search", async (req, res) => {
+  try {
+    const country = req.body.country || "";
+    const city = req.body.city || "";
+    const category = req.body.category || "business";
+    const limit = Math.min(Math.max(Number(req.body.limit || 100), 10), 250);
+
+    if (!country || !city) {
+      return res.status(400).json({ error: "Country and city are required." });
+    }
+
+    const { bbox, elements } = await fetchOsmLeads({ country, city, category, limit });
+
+    const leads = elements
+      .map((element) => osmElementToLead(element, { country, city }))
+      .filter(Boolean)
+      .filter((lead) => lead.businessName && lead.businessName.length > 1);
+
+    const seen = new Set();
+    const unique = leads.filter((lead) => {
+      const key = `${lead.businessName}-${lead.city}-${lead.country}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    res.json({
+      message: "Discovery completed",
+      country,
+      city,
+      category,
+      location: bbox.displayName,
+      fetched: elements.length,
+      found: unique.length,
+      leads: unique
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Discovery search failed",
+      details: error.message
+    });
+  }
 });
 
-app.post("/api/upload/resume", upload.single("resume"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No resume uploaded" });
+app.post("/api/discovery/import", async (req, res) => {
+  try {
+    const leads = Array.isArray(req.body.leads) ? req.body.leads : [];
 
-  const profile = readJson(PROFILE_FILE);
-  profile.resumeUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
-  writeJson(PROFILE_FILE, profile);
+    if (!leads.length) {
+      return res.status(400).json({ error: "No leads provided to import." });
+    }
 
-  res.json({
-    message: "Resume uploaded",
-    resumeUrl: profile.resumeUrl
-  });
+    let imported = 0;
+    let skippedDuplicates = 0;
+
+    for (const raw of leads) {
+      const scored = {
+        ...raw,
+        id: raw.id || id("lead"),
+        ...scoreLead(raw),
+        status: raw.status || "New",
+        source: raw.source || "Public Discovery",
+        createdAt: raw.createdAt || nowIso(),
+        updatedAt: nowIso()
+      };
+
+      const exists = await leadExists(scored);
+      if (exists) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      await saveLead(scored);
+      imported++;
+    }
+
+    await logActivity({
+      leadId: "",
+      leadName: "Discovery Import",
+      action: "Public Leads Imported",
+      details: `Imported ${imported}, skipped ${skippedDuplicates}`
+    });
+
+    res.json({
+      message: "Discovery leads imported",
+      imported,
+      skippedDuplicates
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Discovery import failed",
+      details: error.message
+    });
+  }
 });
 
-app.get("/api/leads", (req, res) => {
-  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || "50", 10), 10), 100);
+app.post("/api/discovery/campaign", async (req, res) => {
+  try {
+    const country = req.body.country || "";
+    const city = req.body.city || "";
+    const categories = Array.isArray(req.body.categories) && req.body.categories.length
+      ? req.body.categories
+      : ["restaurants", "shops", "clinics", "schools"];
 
-  const leads = readJson(LEADS_FILE);
-  const filtered = filterLeads(leads, req.query);
+    if (!country || !city) {
+      return res.status(400).json({ error: "Country and city are required." });
+    }
 
-  const total = filtered.length;
-  const totalPages = Math.max(Math.ceil(total / limit), 1);
-  const safePage = Math.min(page, totalPages);
-  const start = (safePage - 1) * limit;
-  const items = filtered.slice(start, start + limit);
+    const report = [];
 
-  res.json({
-    items,
-    total,
-    page: safePage,
-    limit,
-    totalPages,
-    counts: getFilteredCounts(filtered)
-  });
+    for (const category of categories.slice(0, 8)) {
+      try {
+        const { elements } = await fetchOsmLeads({ country, city, category, limit: 80 });
+
+        const found = elements
+          .map((element) => osmElementToLead(element, { country, city }))
+          .filter(Boolean)
+          .filter((lead) => lead.businessName && lead.businessName.length > 1);
+
+        let imported = 0;
+        let skippedDuplicates = 0;
+
+        for (const lead of found) {
+          const exists = await leadExists(lead);
+          if (exists) {
+            skippedDuplicates++;
+            continue;
+          }
+
+          await saveLead(lead);
+          imported++;
+        }
+
+        report.push({
+          category,
+          found: found.length,
+          imported,
+          skippedDuplicates
+        });
+      } catch (error) {
+        report.push({
+          category,
+          found: 0,
+          imported: 0,
+          skippedDuplicates: 0,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: "Campaign discovery completed",
+      country,
+      city,
+      report
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Campaign discovery failed",
+      details: error.message
+    });
+  }
 });
 
-app.get("/api/leads/:id", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  const lead = leads.find((item) => item.id === req.params.id);
-
-  if (!lead) return res.status(404).json({ error: "Lead not found" });
-
-  res.json(lead);
+app.get("/api/profile", async (req, res) => {
+  try {
+    res.json(await getProfile());
+  } catch (error) {
+    res.status(500).json({ error: "Could not load profile", details: error.message });
+  }
 });
 
-app.delete("/api/leads/clear-all", (req, res) => {
-  writeJson(LEADS_FILE, []);
-  writeJson(LOGS_FILE, []);
-  res.json({ message: "All leads and logs cleared" });
+app.put("/api/profile", async (req, res) => {
+  try {
+    res.json(await saveProfile(req.body));
+  } catch (error) {
+    res.status(500).json({ error: "Could not save profile", details: error.message });
+  }
 });
 
-app.post("/api/leads/import-csv", upload.single("csv"), (req, res) => {
+app.post("/api/upload/resume", upload.single("resume"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No resume uploaded" });
+
+    const profile = await getProfile();
+    const resumeUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const updated = await saveProfile({ ...profile, resumeUrl });
+
+    res.json({ message: "Resume uploaded", resumeUrl: updated.resumeUrl });
+  } catch (error) {
+    res.status(500).json({ error: "Resume upload failed", details: error.message });
+  }
+});
+
+app.get("/api/leads", async (req, res) => {
+  try {
+    res.json(await listLeads(req.query));
+  } catch (error) {
+    res.status(500).json({ error: "Could not load leads", details: error.message });
+  }
+});
+
+app.post("/api/leads", async (req, res) => {
+  try {
+    const scored = scoreLead(req.body);
+    const lead = await saveLead({
+      ...req.body,
+      id: req.body.id || id("lead"),
+      ...scored,
+      status: req.body.status || "New",
+      createdAt: nowIso()
+    });
+
+    await logActivity({
+      leadId: lead.id,
+      leadName: lead.businessName,
+      action: "Lead Created"
+    });
+
+    res.json(lead);
+  } catch (error) {
+    res.status(500).json({ error: "Could not create lead", details: error.message });
+  }
+});
+
+app.put("/api/leads/:id", async (req, res) => {
+  try {
+    const current = await getLead(req.params.id);
+    const updated = await saveLead({ ...current, ...req.body, id: req.params.id });
+
+    await logActivity({
+      leadId: updated.id,
+      leadName: updated.businessName,
+      action: "Lead Updated"
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Could not update lead", details: error.message });
+  }
+});
+
+app.delete("/api/leads/:id", async (req, res) => {
+  try {
+    await deleteLeadById(req.params.id);
+    res.json({ message: "Lead deleted" });
+  } catch (error) {
+    res.status(500).json({ error: "Could not delete lead", details: error.message });
+  }
+});
+
+app.post("/api/leads/import-csv", upload.single("csv"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No CSV file uploaded" });
 
@@ -692,260 +1448,285 @@ app.post("/api/leads/import-csv", upload.single("csv"), (req, res) => {
 
     if (!rows.length) return res.status(400).json({ error: "CSV has no business rows" });
 
-    const existing = readJson(LEADS_FILE);
-    const existingKeys = new Set(
-      existing.map((lead) =>
-        `${lead.osmId || ""}-${lead.name}-${lead.address}-${lead.city}-${lead.country}`.toLowerCase().trim()
-      )
-    );
-
     const prepared = rows
       .map(csvRowToLead)
-      .filter((lead) => lead.name && lead.name.trim().length > 1);
+      .filter((lead) => lead.businessName && lead.businessName.trim().length > 1)
+      .map((lead) => ({ ...lead, ...scoreLead(lead) }));
 
-    if (!prepared.length) {
-      return res.status(400).json({
-        error: "CSV rows found, but no valid business names detected."
-      });
+    let imported = 0;
+    let skippedDuplicates = 0;
+
+    for (const lead of prepared) {
+      const exists = await leadExists(lead);
+
+      if (exists) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      await saveLead(lead);
+      imported++;
     }
-
-    const unique = prepared.filter((lead) => {
-      const key = `${lead.osmId || ""}-${lead.name}-${lead.address}-${lead.city}-${lead.country}`.toLowerCase().trim();
-
-      if (existingKeys.has(key)) return false;
-      existingKeys.add(key);
-      return true;
-    });
-
-    writeJson(LEADS_FILE, [...unique, ...existing]);
 
     res.json({
       message: "CSV imported successfully",
-      imported: unique.length,
-      skippedDuplicates: prepared.length - unique.length,
-      readyToWhatsApp: unique.filter((lead) => lead.phone).length,
-      needsPhone: unique.filter((lead) => !lead.phone).length
+      imported,
+      skippedDuplicates,
+      readyToWhatsApp: prepared.filter((lead) => lead.whatsapp || lead.phone).length,
+      needsPhone: prepared.filter((lead) => !lead.whatsapp && !lead.phone).length
     });
   } catch (error) {
-    res.status(500).json({
-      error: "CSV import failed",
-      details: error.message
-    });
+    res.status(500).json({ error: "CSV import failed", details: error.message });
   }
 });
 
-app.post("/api/import/global", async (req, res) => {
+app.post("/api/leads/bulk-status", async (req, res) => {
   try {
-    const city = req.body.city || "Dubai";
-    const country = req.body.country || "United Arab Emirates";
-    const category = req.body.category || "business";
+    const { ids = [], status } = req.body;
+    if (!status) return res.status(400).json({ error: "Status required" });
 
-    const existing = readJson(LEADS_FILE);
-    const { bbox, elements } = await fetchGlobalBusinesses({ city, country, category });
+    if (useSupabase) {
+      const { error } = await supabase
+        .from("leads")
+        .update({ status, updated_at: nowIso() })
+        .in("id", ids);
 
-    const imported = elements
-      .map((element) => osmElementToLead(element, { city, country }))
-      .filter(Boolean)
-      .filter((lead) => lead.name && lead.name.trim().length > 1);
+      if (error) throw error;
+    } else {
+      const leads = readJson(LEADS_FILE).map((lead) =>
+        ids.includes(lead.id) ? { ...lead, status, updatedAt: nowIso() } : lead
+      );
+      writeJson(LEADS_FILE, leads);
+    }
 
-    const uniqueImported = dedupeLeads(existing, imported);
-    writeJson(LEADS_FILE, [...uniqueImported, ...existing]);
-
-    res.json({
-      message: "Global businesses imported",
-      city,
-      country,
-      category,
-      bbox: bbox.displayName,
-      fetchedElements: elements.length,
-      validBusinesses: imported.length,
-      imported: uniqueImported.length,
-      skippedDuplicates: imported.length - uniqueImported.length,
-      readyToWhatsApp: uniqueImported.filter((lead) => lead.phone).length,
-      needsPhone: uniqueImported.filter((lead) => !lead.phone).length
-    });
+    res.json({ message: "Bulk status updated", count: ids.length });
   } catch (error) {
-    res.status(500).json({
-      error: "Global import failed",
-      details: error.message
+    res.status(500).json({ error: "Bulk update failed", details: error.message });
+  }
+});
+
+app.post("/api/leads/:id/score", async (req, res) => {
+  try {
+    const lead = await getLead(req.params.id);
+    const scored = scoreLead(lead);
+    const updated = await saveLead({ ...lead, ...scored });
+
+    await logActivity({
+      leadId: updated.id,
+      leadName: updated.businessName,
+      action: "Lead Scored",
+      details: `Score: ${updated.leadScore}, Product: ${updated.recommendedProduct}`
     });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Scoring failed", details: error.message });
   }
-});
-
-app.post("/api/leads", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-
-  const lead = {
-    id: Date.now().toString(),
-    osmId: "",
-    name: req.body.name || "",
-    category: req.body.category || "Business",
-    phone: req.body.phone || "",
-    email: req.body.email || "",
-    website: req.body.website || "",
-    country: req.body.country || "",
-    city: req.body.city || "",
-    location: req.body.location || [req.body.city, req.body.country].filter(Boolean).join(", ") || "Global",
-    address: req.body.address || "",
-    contactPerson: req.body.contactPerson || "",
-    notes: req.body.notes || "",
-    status: req.body.phone ? "Ready to WhatsApp" : "Needs Phone",
-    priority: req.body.priority || "Medium",
-    source: "Manual Real Lead",
-    lat: "",
-    lon: "",
-    lastMessage: "",
-    whatsappUrl: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  leads.unshift(lead);
-  writeJson(LEADS_FILE, leads);
-  res.json(lead);
-});
-
-app.put("/api/leads/:id", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  const index = leads.findIndex((lead) => lead.id === req.params.id);
-
-  if (index === -1) return res.status(404).json({ error: "Lead not found" });
-
-  leads[index] = {
-    ...leads[index],
-    ...req.body,
-    status:
-      req.body.status ||
-      (req.body.phone || leads[index].phone ? "Ready to WhatsApp" : "Needs Phone"),
-    updatedAt: new Date().toISOString()
-  };
-
-  if (leads[index].lastMessage && leads[index].phone) {
-    leads[index].whatsappUrl = createWhatsAppUrl(leads[index].phone, leads[index].lastMessage);
-  }
-
-  writeJson(LEADS_FILE, leads);
-  res.json(leads[index]);
-});
-
-app.delete("/api/leads/:id", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  writeJson(
-    LEADS_FILE,
-    leads.filter((lead) => lead.id !== req.params.id)
-  );
-  res.json({ message: "Lead deleted" });
 });
 
 app.post("/api/leads/:id/generate-message", async (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  const profile = readJson(PROFILE_FILE);
-  const index = leads.findIndex((lead) => lead.id === req.params.id);
-
-  if (index === -1) return res.status(404).json({ error: "Lead not found" });
-
-  const goal = req.body.goal || "business";
-  const lead = leads[index];
-  const message = await generateGroqMessage(profile, lead, goal);
-  const whatsappUrl = createWhatsAppUrl(lead.phone, message);
-
-  leads[index] = {
-    ...lead,
-    lastMessage: message,
-    whatsappUrl,
-    status: lead.phone ? "Message Generated" : "Generated - Needs Phone",
-    updatedAt: new Date().toISOString()
-  };
-
-  writeJson(LEADS_FILE, leads);
-  res.json(leads[index]);
-});
-
-app.post("/api/leads/:id/mark-sent", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  const logs = readJson(LOGS_FILE);
-  const index = leads.findIndex((lead) => lead.id === req.params.id);
-
-  if (index === -1) return res.status(404).json({ error: "Lead not found" });
-
-  leads[index] = {
-    ...leads[index],
-    status: "Sent",
-    updatedAt: new Date().toISOString()
-  };
-
-  logs.unshift({
-    id: Date.now().toString(),
-    leadId: leads[index].id,
-    leadName: leads[index].name,
-    action: "Message Sent",
-    channel: req.body.channel || "WhatsApp",
-    location: leads[index].location,
-    createdAt: new Date().toISOString()
-  });
-
-  writeJson(LEADS_FILE, leads);
-  writeJson(LOGS_FILE, logs);
-
-  res.json(leads[index]);
-});
-
-app.post("/api/search-links", (req, res) => {
-  const city = req.body.city || "";
-  const country = req.body.country || "";
-  const category = req.body.category || "businesses";
-  const query = encodeURIComponent(`${category} in ${city} ${country}`.trim());
-
-  res.json({
-    maps: `https://www.google.com/maps/search/${query}`,
-    google: `https://www.google.com/search?q=${query}`,
-    facebook: `https://www.facebook.com/search/pages/?q=${query}`,
-    linkedin: `https://www.linkedin.com/search/results/companies/?keywords=${query}`
-  });
-});
-
-app.get("/api/logs", (req, res) => {
-  const logs = readJson(LOGS_FILE);
-  res.json(logs.slice(0, 100));
-});
-
-app.get("/api/analytics", (req, res) => {
-  const leads = readJson(LEADS_FILE);
-  const filtered = filterLeads(leads, req.query);
-  const countries = [...new Set(leads.map((lead) => lead.country).filter(Boolean))];
-  const cities = [...new Set(leads.map((lead) => lead.city).filter(Boolean))];
-
-  res.json({
-    ...getFilteredCounts(filtered),
-    allLeads: leads.length,
-    countries: countries.length,
-    cities: cities.length,
-    highPriority: filtered.filter((lead) => lead.priority === "High").length
-  });
-});
-app.get('/api/health', async (req, res) => {
   try {
+    const profile = await getProfile();
+    const lead = await getLead(req.params.id);
+    const scored = lead.recommendedProduct ? lead : { ...lead, ...scoreLead(lead) };
+    const mode = req.body.mode || "short_whatsapp";
+    const message = buildMessage({ profile, lead: scored, mode });
+    const url = createWhatsAppUrl(scored.whatsapp || scored.phone, message);
+
+    const updated = await saveLead({
+      ...scored,
+      lastMessage: message,
+      lastMessageMode: mode,
+      status: scored.status === "New" ? "Message Generated" : scored.status,
+      whatsappUrl: url
+    });
+
+    await logActivity({
+      leadId: updated.id,
+      leadName: updated.businessName,
+      action: "Message Generated",
+      channel: mode
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Message generation failed", details: error.message });
+  }
+});
+
+app.post("/api/leads/:id/mark-sent", async (req, res) => {
+  try {
+    const lead = await getLead(req.params.id);
+    const next = new Date();
+    next.setDate(next.getDate() + 3);
+
+    const updated = await saveLead({
+      ...lead,
+      status: "Sent",
+      lastContactedAt: nowIso(),
+      nextFollowUpAt: next.toISOString()
+    });
+
+    await logActivity({
+      leadId: updated.id,
+      leadName: updated.businessName,
+      action: "Message Sent",
+      channel: req.body.channel || "WhatsApp"
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Mark sent failed", details: error.message });
+  }
+});
+
+app.post("/api/leads/:id/analyze-reply", async (req, res) => {
+  try {
+    const lead = await getLead(req.params.id);
+    const reply = req.body.reply || "";
+    const analysis = analyzeReplyText(reply);
+
+    const updated = await saveLead({
+      ...lead,
+      customerReply: reply,
+      replyAnalysis: analysis.analysis,
+      leadTemperature: analysis.interestLevel,
+      status: analysis.updatedStatus,
+      nextAction: analysis.nextAction,
+      nextFollowUpAt: analysis.nextFollowUpAt,
+      conversationNotes: `${lead.conversationNotes || ""}\n\nCustomer reply: ${reply}\nAI Analysis: ${analysis.analysis}\nSuggested reply: ${analysis.bestReply}`.trim()
+    });
+
+    await logActivity({
+      leadId: updated.id,
+      leadName: updated.businessName,
+      action: "Reply Analyzed",
+      details: analysis.analysis
+    });
+
     res.json({
-      status: 'ok',
-      app: 'NexaReach AI',
-      backend: 'online',
-      database: 'connected',
-      platform: 'Render',
-      time: new Date().toISOString()
+      lead: updated,
+      ...analysis
     });
   } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      app: 'NexaReach AI',
-      backend: 'online',
-      database: 'error',
-      error: error.message,
-      time: new Date().toISOString()
+    res.status(500).json({ error: "Reply analysis failed", details: error.message });
+  }
+});
+
+app.get("/api/followups", async (req, res) => {
+  try {
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    let all = [];
+
+    if (useSupabase) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      all = (data || []).map(fromDbLead);
+    } else {
+      all = readJson(LEADS_FILE);
+    }
+
+    res.json({
+      dueToday: all.filter((lead) => lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) <= end),
+      hotLeads: all.filter((lead) => lead.leadTemperature === "Hot" || Number(lead.leadScore || 0) >= 75).slice(0, 100),
+      noResponse: all.filter((lead) => lead.status === "Sent").slice(0, 100),
+      interested: all.filter((lead) => lead.status === "Interested").slice(0, 100),
+      demoBooked: all.filter((lead) => lead.status === "Demo Booked").slice(0, 100),
+      closedWon: all.filter((lead) => lead.status === "Closed Won").slice(0, 100),
+      lost: all.filter((lead) => lead.status === "Lost" || lead.status === "Not Interested").slice(0, 100)
     });
+  } catch (error) {
+    res.status(500).json({ error: "Could not load follow-ups", details: error.message });
+  }
+});
+
+app.get("/api/dashboard", async (req, res) => {
+  try {
+    let all = [];
+
+    if (useSupabase) {
+      const { data, error } = await supabase.from("leads").select("*");
+      if (error) throw error;
+      all = (data || []).map(fromDbLead);
+    } else {
+      all = readJson(LEADS_FILE);
+    }
+
+    const byCountry = {};
+    const byCategory = {};
+
+    for (const lead of all) {
+      const country = lead.country || "Unknown";
+      const category = lead.category || "Unknown";
+      byCountry[country] = (byCountry[country] || 0) + 1;
+      byCategory[category] = (byCategory[category] || 0) + 1;
+    }
+
+    const counts = countLocal(all);
+
+    res.json({
+      ...counts,
+      byCountry,
+      byCategory,
+      mission: `Today focus on ${counts.hot} hot leads, follow up interested clients, and generate demos for warm businesses. Estimated pipeline value: ${counts.estimatedRevenue}.`
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Dashboard failed", details: error.message });
+  }
+});
+
+app.get("/api/logs", async (req, res) => {
+  try {
+    if (useSupabase) {
+      const { data, error } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      res.json(data || []);
+      return;
+    }
+
+    res.json(readJson(LOGS_FILE).slice(0, 100));
+  } catch (error) {
+    res.status(500).json({ error: "Logs failed", details: error.message });
+  }
+});
+
+app.get("/api/export/leads.json", async (req, res) => {
+  try {
+    let all = [];
+
+    if (useSupabase) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      all = (data || []).map(fromDbLead);
+    } else {
+      all = readJson(LEADS_FILE);
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=nexareach-leads-backup.json");
+    res.send(JSON.stringify(all, null, 2));
+  } catch (error) {
+    res.status(500).json({ error: "Export failed", details: error.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`NexaReach Global AI backend running on http://localhost:${PORT}`);
-  console.log("Mode: fast paginated loading enabled");
+  console.log(`NexaReach AI Pro backend running on http://localhost:${PORT}`);
+  console.log(`Phase: 2 Safe Public Discovery`);
+  console.log(`Database mode: ${useSupabase ? "Supabase/PostgreSQL" : "Local JSON fallback"}`);
 });
