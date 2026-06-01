@@ -166,55 +166,6 @@ function buildEmailOpenUrl(lead, message) {
   return `mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-
-function normalizeLead(lead = {}) {
-  const businessName =
-    lead.businessName ||
-    lead.business_name ||
-    lead.name ||
-    lead.company ||
-    lead.title ||
-    "Unnamed Business";
-
-  return {
-    id: String(lead.id || `${businessName}-${lead.city || ""}-${lead.country || ""}`),
-    businessName: String(businessName),
-    name: String(businessName),
-    contactPerson: lead.contactPerson || lead.contact_person || "",
-    phone: lead.phone || "",
-    whatsapp: lead.whatsapp || lead.phone || "",
-    email: lead.email || "",
-    website: lead.website || "",
-    instagram: lead.instagram || "",
-    facebook: lead.facebook || "",
-    linkedin: lead.linkedin || "",
-    country: lead.country || "",
-    city: lead.city || "",
-    category: lead.category || lead.type || "Business",
-    businessSize: lead.businessSize || lead.business_size || "",
-    source: lead.source || "",
-    notes: lead.notes || lead.address || "",
-    status: lead.status || "New",
-    leadScore: Number(lead.leadScore ?? lead.lead_score ?? 0),
-    leadTemperature: lead.leadTemperature || lead.lead_temperature || "Cold",
-    recommendedProduct: lead.recommendedProduct || lead.recommended_product || "",
-    aiReason: lead.aiReason || lead.ai_reason || "",
-    aiProblem: lead.aiProblem || lead.ai_problem || "",
-    aiOutreachAngle: lead.aiOutreachAngle || lead.ai_outreach_angle || "",
-    lastMessage: lead.lastMessage || lead.last_message || "",
-    lastMessageMode: lead.lastMessageMode || lead.last_message_mode || "",
-    lastContactedAt: lead.lastContactedAt || lead.last_contacted_at || "",
-    nextFollowUpAt: lead.nextFollowUpAt || lead.next_follow_up_at || "",
-    conversationNotes: lead.conversationNotes || lead.conversation_notes || "",
-    customerReply: lead.customerReply || lead.customer_reply || "",
-    replyAnalysis: lead.replyAnalysis || lead.reply_analysis || "",
-    nextAction: lead.nextAction || lead.next_action || "",
-    estimatedDealValue: Number(lead.estimatedDealValue ?? lead.estimated_deal_value ?? 0),
-    createdAt: lead.createdAt || lead.created_at || "",
-    updatedAt: lead.updatedAt || lead.updated_at || ""
-  };
-}
-
 function whatsappUrl(phone, message) {
   if (!phone || !message) return "";
   let clean = String(phone).replace(/[^\d]/g, "");
@@ -385,7 +336,7 @@ export default function App() {
   async function loadLeads(customPage = page) {
     try {
       const data = await api(`/api/leads?${query(customPage)}`);
-      setLeads((data.items || []).map(normalizeLead));
+      setLeads(data.items || []);
       setLeadMeta({
         total: data.total || 0,
         page: data.page || 1,
@@ -447,7 +398,7 @@ export default function App() {
         body: JSON.stringify(leadForm)
       });
 
-      setSelectedLead(normalizeLead(created));
+      setSelectedLead(created);
       setLeadForm(emptyLead);
       notify("Lead saved and scored.");
       await loadLeads(1);
@@ -467,7 +418,7 @@ export default function App() {
         body: JSON.stringify(data)
       });
 
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify("Lead updated.");
       await loadLeads(page);
       await loadBase();
@@ -495,7 +446,7 @@ export default function App() {
     setLoading(true);
     try {
       const updated = await api(`/api/leads/${lead.id}/score`, { method: "POST" });
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify(`Lead scored: ${updated.leadScore}/100 — ${updated.recommendedProduct}`);
       await loadLeads(page);
       await loadBase();
@@ -513,7 +464,7 @@ export default function App() {
         body: JSON.stringify({ mode })
       });
 
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify("Message generated.");
       await loadLeads(page);
     } catch (error) {
@@ -538,7 +489,7 @@ export default function App() {
         body: JSON.stringify({ mode: "email_pitch" })
       });
 
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify("Email generated. Opening Gmail compose...");
 
       const gmailLink = buildGmailComposeUrl(updated, updated.lastMessage);
@@ -587,7 +538,7 @@ export default function App() {
         body: JSON.stringify({ mode: "email_pitch" })
       });
 
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify("Email generated. Opening email app...");
 
       const emailLink = buildEmailOpenUrl(updated, updated.lastMessage);
@@ -630,7 +581,7 @@ export default function App() {
         body: JSON.stringify({ channel })
       });
 
-      setSelectedLead(normalizeLead(updated));
+      setSelectedLead(updated);
       notify(`${channel} marked as sent. Follow-up scheduled.`);
       await loadLeads(page);
       await loadBase();
@@ -668,7 +619,7 @@ export default function App() {
       });
 
       setReplyResult(result);
-      setSelectedLead(normalizeLead(result.lead));
+      setSelectedLead(result.lead);
       notify("Reply analyzed.");
       await loadLeads(page);
       await loadBase();
@@ -1283,12 +1234,12 @@ export default function App() {
               <LeadGrid
                 leads={leads}
                 onSelect={(lead) => {
-                  setSelectedLead(normalizeLead(lead));
+                  setSelectedLead(lead);
                   setActiveTab("studio");
                 }}
                 onScore={scoreLead}
                 onGenerate={(lead) => {
-                  setSelectedLead(normalizeLead(lead));
+                  setSelectedLead(lead);
                   setActiveTab("studio");
                   generateMessage(lead);
                 }}
@@ -1711,7 +1662,7 @@ function FollowupSection({ title, leads, setSelectedLead, setActiveTab }) {
             className="lead-card"
             key={lead.id}
             onClick={() => {
-              setSelectedLead(normalizeLead(lead));
+              setSelectedLead(lead);
               setActiveTab("studio");
             }}
           >
@@ -1758,7 +1709,6 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
-
 
 
 

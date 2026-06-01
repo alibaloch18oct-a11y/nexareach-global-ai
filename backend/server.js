@@ -300,6 +300,63 @@ function createWhatsAppUrl(phone, message) {
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
+
+function normalizeLeadForApp(lead = {}) {
+  const businessName =
+    lead.businessName ||
+    lead.business_name ||
+    lead.name ||
+    lead.company ||
+    lead.title ||
+    "Unnamed Business";
+
+  const safeId =
+    lead.id ||
+    lead.osmId ||
+    lead.osm_id ||
+    `lead-${Buffer.from(`${businessName}-${lead.city || ""}-${lead.country || ""}`).toString("hex").slice(0, 20)}`;
+
+  return {
+    id: String(safeId),
+    businessName: String(businessName || "Unnamed Business"),
+    name: String(businessName || "Unnamed Business"),
+    contactPerson: lead.contactPerson || lead.contact_person || "",
+    phone: lead.phone || "",
+    whatsapp: lead.whatsapp || lead.phone || "",
+    email: lead.email || "",
+    website: lead.website || "",
+    instagram: lead.instagram || "",
+    facebook: lead.facebook || "",
+    linkedin: lead.linkedin || "",
+    country: lead.country || "",
+    city: lead.city || "",
+    location: lead.location || [lead.city, lead.country].filter(Boolean).join(", "),
+    address: lead.address || lead.notes || "",
+    category: lead.category || lead.type || lead.businessType || "Business",
+    businessSize: lead.businessSize || lead.business_size || "",
+    source: lead.source || "Imported/Legacy",
+    notes: lead.notes || lead.address || "",
+    status: lead.status || "New",
+    leadScore: Number(lead.leadScore ?? lead.lead_score ?? 0),
+    leadTemperature: lead.leadTemperature || lead.lead_temperature || "Cold",
+    recommendedProduct: lead.recommendedProduct || lead.recommended_product || "",
+    aiReason: lead.aiReason || lead.ai_reason || "",
+    aiProblem: lead.aiProblem || lead.ai_problem || "",
+    aiOutreachAngle: lead.aiOutreachAngle || lead.ai_outreach_angle || "",
+    lastMessage: lead.lastMessage || lead.last_message || "",
+    lastMessageMode: lead.lastMessageMode || lead.last_message_mode || "",
+    lastContactedAt: lead.lastContactedAt || lead.last_contacted_at || "",
+    nextFollowUpAt: lead.nextFollowUpAt || lead.next_follow_up_at || "",
+    conversationNotes: lead.conversationNotes || lead.conversation_notes || "",
+    customerReply: lead.customerReply || lead.customer_reply || "",
+    replyAnalysis: lead.replyAnalysis || lead.reply_analysis || "",
+    nextAction: lead.nextAction || lead.next_action || "",
+    estimatedDealValue: Number(lead.estimatedDealValue ?? lead.estimated_deal_value ?? 0),
+    createdAt: lead.createdAt || lead.created_at || nowIso(),
+    updatedAt: lead.updatedAt || lead.updated_at || nowIso()
+  };
+}
+
 function toDbLead(lead) {
   return {
     id: lead.id,
@@ -340,7 +397,7 @@ function toDbLead(lead) {
 }
 
 function fromDbLead(row) {
-  return {
+  return normalizeLeadForApp({
     id: row.id,
     businessName: row.business_name || "",
     name: row.business_name || "",
@@ -354,8 +411,6 @@ function fromDbLead(row) {
     linkedin: row.linkedin || "",
     country: row.country || "",
     city: row.city || "",
-    location: [row.city, row.country].filter(Boolean).join(", "),
-    address: row.notes || "",
     category: row.category || "Business",
     businessSize: row.business_size || "",
     source: row.source || "",
@@ -378,7 +433,7 @@ function fromDbLead(row) {
     estimatedDealValue: Number(row.estimated_deal_value || 0),
     createdAt: row.created_at || "",
     updatedAt: row.updated_at || ""
-  };
+  });
 }
 
 function toDbProfile(profile) {
@@ -748,7 +803,7 @@ function applyContactStatus(lead) {
     }
   }
 
-  return lead;
+  return normalizeLeadForApp(lead);
 }
 
 function buildLeadLinks(lead) {
@@ -858,10 +913,7 @@ async function listLeads(query) {
     };
   }
 
-  const all = readJson(LEADS_FILE).map((lead) => ({
-    ...lead,
-    businessName: lead.businessName || lead.name || lead.business_name || ""
-  }));
+  const all = readJson(LEADS_FILE).map((lead) => normalizeLeadForApp(lead));
 
   const filtered = all.filter((lead) => {
     const matchesCountry = country === "All Countries" || !country ? true : lead.country === country;
@@ -914,7 +966,7 @@ async function getLead(leadId) {
 
   const lead = readJson(LEADS_FILE).find((item) => item.id === leadId);
   if (!lead) throw new Error("Lead not found");
-  return lead;
+  return normalizeLeadForApp(lead);
 }
 
 async function saveLead(lead) {
@@ -1966,6 +2018,7 @@ app.listen(PORT, () => {
   console.log(`Phase: 2 Safe Public Discovery`);
   console.log(`Database mode: ${useSupabase ? "Supabase/PostgreSQL" : "Local JSON fallback"}`);
 });
+
 
 
 
