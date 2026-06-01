@@ -750,6 +750,7 @@ async function listLeads(query) {
   const country = query.country || "All Countries";
   const city = query.city || "All Cities";
   const status = query.status || "All";
+  const categoryFilter = query.category || "All Categories";
   const q = String(query.q || "").trim();
 
   if (useSupabase) {
@@ -760,6 +761,10 @@ async function listLeads(query) {
 
     if (country && country !== "All Countries") db = db.eq("country", country);
     if (city && city !== "All Cities") db = db.eq("city", city);
+
+    if (categoryFilter && categoryFilter !== "All Categories") {
+      db = db.ilike("category", `%${categoryFilter}%`);
+    }
 
     if (status && status !== "All") {
       if (status === "Ready to WhatsApp") {
@@ -802,6 +807,11 @@ async function listLeads(query) {
     const matchesCountry = country === "All Countries" || !country ? true : lead.country === country;
     const matchesCity = city === "All Cities" || !city ? true : lead.city === city;
 
+    const matchesCategory =
+      categoryFilter === "All Categories" || !categoryFilter
+        ? true
+        : String(lead.category || "").toLowerCase().includes(String(categoryFilter).toLowerCase());
+
     const matchesStatus =
       status === "All"
         ? true
@@ -814,7 +824,7 @@ async function listLeads(query) {
     const haystack = `${lead.businessName} ${lead.category} ${lead.country} ${lead.city} ${lead.email} ${lead.phone}`.toLowerCase();
     const matchesSearch = q ? haystack.includes(q.toLowerCase()) : true;
 
-    return matchesCountry && matchesCity && matchesStatus && matchesSearch;
+    return matchesCountry && matchesCity && matchesCategory && matchesStatus && matchesSearch;
   });
 
   const items = filtered.slice(from, from + limit);
@@ -1080,6 +1090,139 @@ async function fetchOsmLeads({ country, city, category, limit = 100 }) {
   throw lastError || new Error("All public discovery endpoints failed.");
 }
 
+
+function strictBusinessCategoryMatch(element, selectedCategory = "business") {
+  const tags = element.tags || {};
+  const category = String(selectedCategory || "business").toLowerCase();
+
+  const text = [
+    tags.name,
+    tags["name:en"],
+    tags.brand,
+    tags.operator,
+    tags.office,
+    tags.shop,
+    tags.amenity,
+    tags.tourism,
+    tags.leisure,
+    tags.website,
+    tags["contact:website"],
+    tags.description
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const hasAny = (words) => words.some((word) => text.includes(word));
+
+  if (category.includes("software") || category.includes("it companies") || category.includes("it company")) {
+    return (
+      tags.office === "it" ||
+      hasAny([
+        "software",
+        "technology",
+        "tech",
+        "it ",
+        " i.t",
+        "computer",
+        "web",
+        "digital",
+        "solutions",
+        "systems",
+        "apps",
+        "app development",
+        "development",
+        "programming",
+        "code",
+        "cyber",
+        "network"
+      ])
+    );
+  }
+
+  if (category.includes("company offices") || category.includes("company office")) {
+    return Boolean(tags.office);
+  }
+
+  if (category.includes("restaurant")) {
+    return tags.amenity === "restaurant" || tags.amenity === "fast_food";
+  }
+
+  if (category.includes("cafe")) {
+    return tags.amenity === "cafe";
+  }
+
+  if (category.includes("bank")) {
+    return tags.amenity === "bank" || tags.amenity === "atm";
+  }
+
+  if (category.includes("school")) {
+    return ["school", "college", "university"].includes(tags.amenity);
+  }
+
+  if (category.includes("clinic")) {
+    return ["clinic", "doctors"].includes(tags.amenity);
+  }
+
+  if (category.includes("hospital")) {
+    return tags.amenity === "hospital";
+  }
+
+  if (category.includes("pharmacy")) {
+    return tags.amenity === "pharmacy";
+  }
+
+  if (category.includes("hotel")) {
+    return ["hotel", "guest_house", "hostel", "motel"].includes(tags.tourism);
+  }
+
+  if (category.includes("mobile")) {
+    return tags.shop === "mobile_phone" || hasAny(["mobile", "phone", "cell"]);
+  }
+
+  if (category.includes("electronics")) {
+    return tags.shop === "electronics" || hasAny(["electronics", "electronic"]);
+  }
+
+  if (category.includes("real estate")) {
+    return tags.office === "estate_agent" || hasAny(["real estate", "property", "estate"]);
+  }
+
+  if (category.includes("travel")) {
+    return tags.office === "travel_agent" || hasAny(["travel", "tour", "visa"]);
+  }
+
+  if (category.includes("salon")) {
+    return tags.shop === "hairdresser" || tags.shop === "beauty" || hasAny(["salon", "beauty", "spa", "barber"]);
+  }
+
+  if (category.includes("repair")) {
+    return hasAny(["repair", "service center", "service centre"]) || ["computer", "electronics", "mobile_phone"].includes(tags.shop);
+  }
+
+  if (category.includes("law")) {
+    return tags.office === "lawyer" || hasAny(["law", "legal", "lawyer", "advocate"]);
+  }
+
+  if (category.includes("account")) {
+    return tags.office === "accountant" || hasAny(["account", "tax", "audit"]);
+  }
+
+  if (category.includes("fuel")) {
+    return tags.amenity === "fuel";
+  }
+
+  if (category.includes("gym")) {
+    return tags.leisure === "fitness_centre" || hasAny(["gym", "fitness"]);
+  }
+
+  if (category.includes("shop")) {
+    return Boolean(tags.shop);
+  }
+
+  return true;
+}
+
 function osmElementToLead(element, meta) {
   const tags = element.tags || {};
   const businessName = tags.name || tags["name:en"] || tags.brand || tags.operator || "";
@@ -1097,7 +1240,7 @@ function osmElementToLead(element, meta) {
   const lat = element.lat || element.center?.lat || "";
   const lon = element.lon || element.center?.lon || "";
   const osmId = `${element.type}/${element.id}`;
-  const category = mapOsmCategory(tags);
+  const category = meta.category || mapOsmCategory(tags);
   const notes = buildAddress(tags, `${meta.city}, ${meta.country}`);
 
   const lead = {
@@ -1214,7 +1357,8 @@ app.post("/api/discovery/search", async (req, res) => {
     const { bbox, elements } = await fetchOsmLeads({ country, city, category, limit });
 
     const leads = elements
-      .map((element) => osmElementToLead(element, { country, city }))
+      .filter((element) => strictBusinessCategoryMatch(element, category))
+      .map((element) => osmElementToLead(element, { country, city, category }))
       .filter(Boolean)
       .filter((lead) => lead.businessName && lead.businessName.length > 1);
 
@@ -1315,7 +1459,8 @@ app.post("/api/discovery/campaign", async (req, res) => {
         const { elements } = await fetchOsmLeads({ country, city, category, limit: 80 });
 
         const found = elements
-          .map((element) => osmElementToLead(element, { country, city }))
+          .filter((element) => strictBusinessCategoryMatch(element, category))
+          .map((element) => osmElementToLead(element, { country, city, category }))
           .filter(Boolean)
           .filter((lead) => lead.businessName && lead.businessName.length > 1);
 
@@ -1742,4 +1887,5 @@ app.listen(PORT, () => {
   console.log(`Phase: 2 Safe Public Discovery`);
   console.log(`Database mode: ${useSupabase ? "Supabase/PostgreSQL" : "Local JSON fallback"}`);
 });
+
 

@@ -149,6 +149,7 @@ export default function App() {
   const [selectedCountry, setSelectedCountry] = useState("All Countries");
   const [selectedCity, setSelectedCity] = useState("All Cities");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
 
@@ -210,6 +211,7 @@ export default function App() {
       country: selectedCountry,
       city: selectedCity,
       status: statusFilter,
+      category: selectedCategory,
       q: searchText
     });
     return params.toString();
@@ -282,7 +284,7 @@ export default function App() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [selectedCountry, selectedCity, statusFilter, searchText]);
+  }, [selectedCountry, selectedCity, statusFilter, selectedCategory, searchText]);
 
   useEffect(() => {
     loadLeads(page);
@@ -564,6 +566,7 @@ export default function App() {
       setSelectedCountry(discoveryCountry);
       setSelectedCity(discoveryCity);
       setStatusFilter("All");
+      setSelectedCategory(discoveryCategory);
       setPage(1);
 
       await loadLeads(1);
@@ -620,6 +623,7 @@ export default function App() {
       setSelectedCountry(discoveryCountry);
       setSelectedCity(discoveryCity);
       setStatusFilter("All");
+      setSelectedCategory(discoveryCategory);
       setPage(1);
 
       await loadLeads(1);
@@ -674,6 +678,7 @@ export default function App() {
       setSelectedCountry(discoveryCountry);
       setSelectedCity(discoveryCity);
       setStatusFilter("All");
+      setSelectedCategory(discoveryCategory);
       setPage(1);
 
       await loadLeads(1);
@@ -1473,4 +1478,5 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
