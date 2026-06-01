@@ -678,6 +678,25 @@ export default function App() {
     setLoading(false);
   }
 
+
+  function openCurrentDefaultEmailDraft() {
+    if (!selectedLead?.email) {
+      notify("This lead has no email. Add email first.");
+      return;
+    }
+
+    if (!selectedLead?.lastMessage) {
+      notify("Generate an email message first.");
+      return;
+    }
+
+    const emailLink = buildEmailOpenUrl(selectedLead, selectedLead.lastMessage);
+
+    if (emailLink) {
+      window.location.href = emailLink;
+    }
+  }
+
   async function copyMessage() {
     if (!selectedLead?.lastMessage) return;
     await navigator.clipboard.writeText(selectedLead.lastMessage);
@@ -1758,6 +1777,7 @@ function Textarea({ label, value, onChange }) {
     </label>
   );
 }
+
 
 
 
