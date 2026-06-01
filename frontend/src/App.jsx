@@ -30,24 +30,25 @@ import {
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const countries = [
-  "All Countries",
-  "Pakistan",
-  "United Arab Emirates",
-  "Saudi Arabia",
-  "Qatar",
-  "Malaysia",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Australia",
-  "Germany",
-  "France",
-  "Italy",
-  "Spain",
-  "Netherlands",
-  "Any Country"
-];
+const countryCityMap = {
+  Pakistan: ["Karachi", "Lahore", "Islamabad", "Hyderabad", "Rawalpindi", "Faisalabad", "Multan", "Peshawar", "Quetta", "Sukkur"],
+  "United Arab Emirates": ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah"],
+  "Saudi Arabia": ["Riyadh", "Jeddah", "Dammam", "Makkah", "Madinah", "Khobar", "Tabuk"],
+  Qatar: ["Doha", "Al Rayyan", "Al Wakrah", "Umm Salal"],
+  Malaysia: ["Kuala Lumpur", "George Town", "Johor Bahru", "Shah Alam", "Petaling Jaya"],
+  "United Kingdom": ["London", "Manchester", "Birmingham", "Leeds", "Liverpool", "Glasgow"],
+  "United States": ["New York", "Los Angeles", "Chicago", "Houston", "Dallas", "Miami", "San Francisco"],
+  Canada: ["Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa"],
+  Australia: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide"],
+  Germany: ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne"],
+  France: ["Paris", "Lyon", "Marseille", "Toulouse"],
+  Italy: ["Rome", "Milan", "Naples", "Turin"],
+  Spain: ["Madrid", "Barcelona", "Valencia", "Seville"],
+  Netherlands: ["Amsterdam", "Rotterdam", "The Hague", "Utrecht"]
+};
+
+const filterCountries = ["All Countries", ...Object.keys(countryCityMap)];
+const discoveryCountries = Object.keys(countryCityMap);
 
 const statuses = [
   "All",
@@ -65,6 +66,31 @@ const statuses = [
   "Needs Phone"
 ];
 
+const businessCategories = [
+  "business",
+  "restaurants",
+  "cafes",
+  "software houses",
+  "IT companies",
+  "company offices",
+  "shops",
+  "mobile shops",
+  "electronics shops",
+  "clinics",
+  "hospitals",
+  "pharmacies",
+  "schools",
+  "hotels",
+  "real estate agencies",
+  "travel agencies",
+  "salons",
+  "repair shops",
+  "law offices",
+  "accounting offices",
+  "fuel stations",
+  "gyms"
+];
+
 const messageModes = [
   ["short_whatsapp", "Short WhatsApp"],
   ["international_formal", "International Formal"],
@@ -73,22 +99,6 @@ const messageModes = [
   ["follow_up", "Follow-up"],
   ["final_reminder", "Final Reminder"],
   ["call_script", "Call Script"]
-];
-
-const defaultDiscoveryCategories = [
-  "restaurants",
-  "software houses",
-  "IT companies",
-  "company offices",
-  "shops",
-  "mobile shops",
-  "clinics",
-  "schools",
-  "hotels",
-  "real estate agencies",
-  "travel agencies",
-  "salons",
-  "repair shops"
 ];
 
 const emptyLead = {
@@ -135,11 +145,13 @@ export default function App() {
   const [replyText, setReplyText] = useState("");
   const [replyResult, setReplyResult] = useState(null);
   const [messageMode, setMessageMode] = useState("short_whatsapp");
+
   const [selectedCountry, setSelectedCountry] = useState("All Countries");
   const [selectedCity, setSelectedCity] = useState("All Cities");
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
+
   const [notice, setNotice] = useState("");
   const [backendWarning, setBackendWarning] = useState("");
   const [loading, setLoading] = useState(false);
@@ -148,11 +160,11 @@ export default function App() {
   const [discoveryCountry, setDiscoveryCountry] = useState("United Arab Emirates");
   const [discoveryCity, setDiscoveryCity] = useState("Dubai");
   const [discoveryCategory, setDiscoveryCategory] = useState("restaurants");
-  const [discoveryLimit, setDiscoveryLimit] = useState(100);
-  const [discoveryCategories, setDiscoveryCategories] = useState(defaultDiscoveryCategories);
+  const [discoveryLimit, setDiscoveryLimit] = useState(150);
   const [discoveredLeads, setDiscoveredLeads] = useState([]);
   const [discoveryReport, setDiscoveryReport] = useState(null);
   const [selectedDiscoveryIds, setSelectedDiscoveryIds] = useState({});
+  const [discoveryBusyText, setDiscoveryBusyText] = useState("");
 
   async function api(path, options = {}) {
     try {
@@ -177,6 +189,20 @@ export default function App() {
     setTimeout(() => setNotice(""), 6500);
   }
 
+  function handleFilterCountryChange(country) {
+    setSelectedCountry(country);
+    setSelectedCity("All Cities");
+    setPage(1);
+  }
+
+  function handleDiscoveryCountryChange(country) {
+    setDiscoveryCountry(country);
+    setDiscoveryCity(countryCityMap[country]?.[0] || "");
+    setDiscoveredLeads([]);
+    setDiscoveryReport(null);
+    setSelectedDiscoveryIds({});
+  }
+
   function query(customPage = page) {
     const params = new URLSearchParams({
       page: String(customPage),
@@ -191,13 +217,12 @@ export default function App() {
 
   async function loadBase() {
     try {
-      const [profileData, productData, dashData, logsData, followupData, cats] = await Promise.all([
+      const [profileData, productData, dashData, logsData, followupData] = await Promise.all([
         api("/api/profile"),
         api("/api/products"),
         api("/api/dashboard"),
         api("/api/logs"),
-        api("/api/followups"),
-        api("/api/discovery/categories")
+        api("/api/followups")
       ]);
 
       setProfile(profileData);
@@ -205,7 +230,6 @@ export default function App() {
       setDashboard(dashData);
       setLogs(logsData);
       setFollowups(followupData);
-      setDiscoveryCategories(cats || defaultDiscoveryCategories);
       setBackendWarning("");
     } catch (error) {
       setBackendWarning(error.message);
@@ -441,12 +465,13 @@ export default function App() {
   }
 
   async function runDiscoverySearch() {
-    if (!discoveryCountry.trim() || !discoveryCity.trim()) {
-      notify("Country and city are required.");
+    if (!discoveryCountry.trim() || !discoveryCity.trim() || !discoveryCategory.trim()) {
+      notify("Country, city and business category are required.");
       return;
     }
 
     setLoading(true);
+    setDiscoveryBusyText(`Searching ${discoveryCategory} in ${discoveryCity}, ${discoveryCountry}...`);
     setDiscoveryReport(null);
     setDiscoveredLeads([]);
     setSelectedDiscoveryIds({});
@@ -458,23 +483,27 @@ export default function App() {
           country: discoveryCountry,
           city: discoveryCity,
           category: discoveryCategory,
-          limit: Number(discoveryLimit || 100)
+          limit: Number(discoveryLimit || 150)
         })
       });
 
-      setDiscoveredLeads(data.leads || []);
+      const leads = data.leads || [];
+      setDiscoveredLeads(leads);
       setDiscoveryReport(data);
+
       const selected = {};
-      (data.leads || []).forEach((lead) => {
+      leads.forEach((lead) => {
         selected[lead.id] = true;
       });
       setSelectedDiscoveryIds(selected);
-      notify(`Discovery found ${data.found} leads in ${data.city}, ${data.country}.`);
+
+      notify(`Found ${data.found} ${discoveryCategory} leads in ${data.city}, ${data.country}.`);
     } catch (error) {
       notify(error.message);
     }
 
     setLoading(false);
+    setDiscoveryBusyText("");
   }
 
   async function importDiscoveredLeads(onlySelected = true) {
@@ -483,11 +512,13 @@ export default function App() {
       : discoveredLeads;
 
     if (!leadsToImport.length) {
-      notify("No discovery leads selected.");
+      notify("No discovered leads selected.");
       return;
     }
 
     setLoading(true);
+    setDiscoveryBusyText(`Importing ${leadsToImport.length} selected businesses...`);
+
     try {
       const data = await api("/api/discovery/import", {
         method: "POST",
@@ -495,14 +526,77 @@ export default function App() {
       });
 
       notify(`Imported ${data.imported}. Skipped duplicates: ${data.skippedDuplicates}.`);
-      await loadLeads(1);
-      await loadBase();
+
       setSelectedCountry(discoveryCountry);
       setSelectedCity(discoveryCity);
+      setStatusFilter("All");
+      setPage(1);
+
+      await loadLeads(1);
+      await loadBase();
+      setActiveTab("leads");
     } catch (error) {
       notify(error.message);
     }
+
     setLoading(false);
+    setDiscoveryBusyText("");
+  }
+
+  async function searchAndImportSelectedBusiness() {
+    if (!discoveryCountry.trim() || !discoveryCity.trim() || !discoveryCategory.trim()) {
+      notify("Country, city and business category are required.");
+      return;
+    }
+
+    setLoading(true);
+    setDiscoveryBusyText(`Finding and importing all ${discoveryCategory} in ${discoveryCity}, ${discoveryCountry}...`);
+
+    try {
+      const found = await api("/api/discovery/search", {
+        method: "POST",
+        body: JSON.stringify({
+          country: discoveryCountry,
+          city: discoveryCity,
+          category: discoveryCategory,
+          limit: Number(discoveryLimit || 150)
+        })
+      });
+
+      const foundLeads = found.leads || [];
+      setDiscoveredLeads(foundLeads);
+      setDiscoveryReport(found);
+
+      if (!foundLeads.length) {
+        notify(`No ${discoveryCategory} found in ${discoveryCity}, ${discoveryCountry}.`);
+        setLoading(false);
+        setDiscoveryBusyText("");
+        return;
+      }
+
+      const imported = await api("/api/discovery/import", {
+        method: "POST",
+        body: JSON.stringify({ leads: foundLeads })
+      });
+
+      notify(
+        `Done. Found ${found.found}. Imported ${imported.imported}. Skipped duplicates: ${imported.skippedDuplicates}.`
+      );
+
+      setSelectedCountry(discoveryCountry);
+      setSelectedCity(discoveryCity);
+      setStatusFilter("All");
+      setPage(1);
+
+      await loadLeads(1);
+      await loadBase();
+      setActiveTab("leads");
+    } catch (error) {
+      notify(error.message);
+    }
+
+    setLoading(false);
+    setDiscoveryBusyText("");
   }
 
   async function runDiscoveryCampaign() {
@@ -523,6 +617,8 @@ export default function App() {
     ];
 
     setLoading(true);
+    setDiscoveryBusyText(`Running multi-category campaign in ${discoveryCity}, ${discoveryCountry}...`);
+
     try {
       const data = await api("/api/discovery/campaign", {
         method: "POST",
@@ -540,15 +636,29 @@ export default function App() {
       });
 
       notify("Campaign discovery completed.");
-      await loadLeads(1);
-      await loadBase();
+
       setSelectedCountry(discoveryCountry);
       setSelectedCity(discoveryCity);
+      setStatusFilter("All");
+      setPage(1);
+
+      await loadLeads(1);
+      await loadBase();
+      setActiveTab("leads");
     } catch (error) {
       notify(error.message);
     }
 
     setLoading(false);
+    setDiscoveryBusyText("");
+  }
+
+  function toggleAllDiscovered(value) {
+    const selected = {};
+    discoveredLeads.forEach((lead) => {
+      selected[lead.id] = value;
+    });
+    setSelectedDiscoveryIds(selected);
   }
 
   const tabs = [
@@ -566,6 +676,13 @@ export default function App() {
   const openWhatsapp = selectedLead
     ? whatsappUrl(selectedLead.whatsapp || selectedLead.phone, selectedLead.lastMessage)
     : "";
+
+  const filteredCityOptions =
+    selectedCountry === "All Countries"
+      ? ["All Cities"]
+      : ["All Cities", ...(countryCityMap[selectedCountry] || [])];
+
+  const discoveryCityOptions = countryCityMap[discoveryCountry] || [];
 
   return (
     <div className="app-shell">
@@ -595,8 +712,14 @@ export default function App() {
 
         <div className="side-card">
           <Globe2 size={20} />
-          <h3>Phase 2</h3>
-          <p>Safe public discovery + global CRM. API: {API}</p>
+          <h3>Discovery Ready</h3>
+          <p>Country → City → Business → Import all selected leads.</p>
+        </div>
+
+        <div className="side-card">
+          <Sparkles size={20} />
+          <h3>API</h3>
+          <p>{API}</p>
         </div>
       </aside>
 
@@ -610,8 +733,8 @@ export default function App() {
           <div className="global-filter">
             <label>
               <span>Country</span>
-              <select value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value)}>
-                {countries.map((country) => (
+              <select value={selectedCountry} onChange={(e) => handleFilterCountryChange(e.target.value)}>
+                {filterCountries.map((country) => (
                   <option key={country}>{country}</option>
                 ))}
               </select>
@@ -619,10 +742,11 @@ export default function App() {
 
             <label>
               <span>City</span>
-              <input
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value || "All Cities")}
-              />
+              <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)}>
+                {filteredCityOptions.map((city) => (
+                  <option key={city}>{city}</option>
+                ))}
+              </select>
             </label>
 
             <button className="ghost-btn" onClick={() => { loadBase(); loadLeads(page); }}>
@@ -679,36 +803,79 @@ export default function App() {
             <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">Safe Public Lead Discovery</p>
-                  <h3>Find Global Businesses</h3>
+                  <p className="eyebrow">Fixed Discover Flow</p>
+                  <h3>Select Country, City and Business</h3>
                 </div>
               </div>
 
-              <div className="form-grid single">
-                <Input label="Country" value={discoveryCountry} onChange={setDiscoveryCountry} />
-                <Input label="City" value={discoveryCity} onChange={setDiscoveryCity} />
+              <div className="discovery-flow">
+                <label className="field">
+                  <span>1. Select Country</span>
+                  <select value={discoveryCountry} onChange={(e) => handleDiscoveryCountryChange(e.target.value)}>
+                    {discoveryCountries.map((country) => (
+                      <option key={country}>{country}</option>
+                    ))}
+                  </select>
+                </label>
 
                 <label className="field">
-                  <span>Category</span>
+                  <span>2. Select City</span>
+                  <select value={discoveryCity} onChange={(e) => setDiscoveryCity(e.target.value)}>
+                    {discoveryCityOptions.map((city) => (
+                      <option key={city}>{city}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span>3. Select Business Type</span>
                   <select value={discoveryCategory} onChange={(e) => setDiscoveryCategory(e.target.value)}>
-                    {discoveryCategories.map((category) => (
+                    {businessCategories.map((category) => (
                       <option key={category}>{category}</option>
                     ))}
                   </select>
                 </label>
 
-                <Input label="Limit" value={discoveryLimit} onChange={setDiscoveryLimit} />
+                <label className="field">
+                  <span>Search Limit</span>
+                  <select value={discoveryLimit} onChange={(e) => setDiscoveryLimit(Number(e.target.value))}>
+                    <option value={50}>50 businesses</option>
+                    <option value={100}>100 businesses</option>
+                    <option value={150}>150 businesses</option>
+                    <option value={250}>250 businesses</option>
+                  </select>
+                </label>
               </div>
 
-              <button className="primary-btn full" onClick={runDiscoverySearch} disabled={loading}>
-                {loading ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
-                Search Public Leads
+              <div className="discovery-summary-box">
+                <p>
+                  Selected:
+                  <b> {discoveryCategory}</b> in
+                  <b> {discoveryCity}</b>,
+                  <b> {discoveryCountry}</b>
+                </p>
+              </div>
+
+              <button className="primary-btn full" onClick={searchAndImportSelectedBusiness} disabled={loading}>
+                {loading ? <Loader2 className="spin" size={18} /> : <Rocket size={18} />}
+                Find & Import All Selected Businesses
               </button>
 
-              <button className="secondary-btn full" onClick={runDiscoveryCampaign} disabled={loading}>
-                <Rocket size={18} />
-                Auto Campaign: Import Multiple Categories
+              <button className="secondary-btn full" onClick={runDiscoverySearch} disabled={loading}>
+                {loading ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
+                Search First / Preview Before Import
               </button>
+
+              <button className="ghost-btn full" onClick={runDiscoveryCampaign} disabled={loading}>
+                <Globe2 size={18} />
+                Import Multiple Categories For This City
+              </button>
+
+              {discoveryBusyText && (
+                <div className="notice">
+                  {discoveryBusyText}
+                </div>
+              )}
 
               {discoveryReport && (
                 <div className="ai-box">
@@ -734,18 +901,21 @@ export default function App() {
             <div className="panel">
               <div className="section-head">
                 <div>
-                  <p className="eyebrow">Preview Before Saving</p>
-                  <h3>Discovered Leads</h3>
-                  <p className="muted-line">{discoveredLeads.length} leads ready for review</p>
+                  <p className="eyebrow">Preview Results</p>
+                  <h3>Discovered Businesses</h3>
+                  <p className="muted-line">{discoveredLeads.length} businesses found</p>
                 </div>
 
                 <div className="top-actions">
+                  <button className="ghost-btn" onClick={() => toggleAllDiscovered(true)} disabled={!discoveredLeads.length}>
+                    Select All
+                  </button>
+                  <button className="ghost-btn" onClick={() => toggleAllDiscovered(false)} disabled={!discoveredLeads.length}>
+                    Unselect All
+                  </button>
                   <button className="primary-btn" onClick={() => importDiscoveredLeads(true)} disabled={!discoveredLeads.length || loading}>
                     <Save size={17} />
                     Import Selected
-                  </button>
-                  <button className="ghost-btn" onClick={() => importDiscoveredLeads(false)} disabled={!discoveredLeads.length || loading}>
-                    Import All
                   </button>
                 </div>
               </div>
@@ -791,8 +961,8 @@ export default function App() {
                 {!discoveredLeads.length && (
                   <div className="empty">
                     <Globe2 size={44} />
-                    <h3>No discovered leads yet</h3>
-                    <p>Choose country, city, category and click Search Public Leads.</p>
+                    <h3>No preview yet</h3>
+                    <p>Select country, city and business type. Then click Search First or Find & Import.</p>
                   </div>
                 )}
               </div>
